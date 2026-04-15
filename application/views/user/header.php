@@ -44,13 +44,12 @@
                         <ul class="layui-nav" lay-filter="">
                             <li class="layui-nav-item"><a href="/home/multiple"><i class="layui-icon layui-icon-upload"></i> 多图上传</a></li>
                             <li class="layui-nav-item"><a href="/found"><i class="layui-icon layui-icon-search"></i> 探索发现</a></li>
-                            <li class="layui-nav-item"><a href="https://dwz.ovh/9" target="_blank" rel="nofollow"><i class="layui-icon layui-icon-rmb"></i> 购买专业版</a></li>
                             <li class="layui-nav-item">
                                 <a href="javascript:;" target = "_blank" rel = "nofollow"><i class="layui-icon layui-icon-tabs"></i> 其它选项</a>
                                 <dl class="layui-nav-child"> <!-- 二级菜单 -->
-                                    <dd><a href="https://dwz.ovh/imgurldoc" rel = "nofollow" target = "_blank">帮助文档</a></dd>
+                                    <dd><a href="https://github.com/doge24190/imgurl-lite" rel = "nofollow" target = "_blank">帮助文档</a></dd>
                                     <dd><a href="/home/log" rel = "nofollow" target = "_blank">更新日志</a></dd>
-                                    <dd><a href="https://github.com/helloxz/imgurl" rel = "nofollow" target = "_blank">源码下载</a></dd>
+                                    <dd><a href="https://github.com/doge24190/imgurl-lite" rel = "nofollow" target = "_blank">源码下载</a></dd>
                                 </dl>
                             </li>
                             <!-- 简单判断用户是否登录 -->

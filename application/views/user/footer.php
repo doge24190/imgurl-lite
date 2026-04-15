@@ -10,9 +10,8 @@
 	<div class = "footer">
 		<div class = "layui-container">
 			<div class = "layui-row">
-				<!--未经作者授权，请勿去掉版权，谢谢-->
 				<div class = "layui-col-lg12">
-					Copyright © 2017-2019 Powered by <a href="https://imgurl.org/" target = "_blank" title = "ImgURL是一个开源免费的图床程序">ImgURL</a> | Author <a href="https://www.xiaoz.me/" target = "_blank" title = "小z博客">xiaoz.me</a> | 
+					Copyright © 2017-2016 Powered by <a href="https://imgurl.org/" target = "_blank" title = "ImgURL是一个开源免费的图床程序">ImgURL</a> | Edited by <a href="https://www.doge24190.top/" target = "_blank" title = "狗窝">doge24190.top</a> | 
 					<!-- 简单判断用户是否登录 -->
 					<?php if((isset($_COOKIE['user'])) && (isset($_COOKIE['token']))){ ?>
 						<a href="/user/logout">logout</a>
