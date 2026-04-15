@@ -51,56 +51,5 @@
             $this->load->view('admin/uplimit');
             $this->load->view('admin/footer');
         }
-        //图片压缩
-        public function compress(){
-            //页面标题
-            $data['admin_title']  =   '图片压缩';
-
-            //加载模型
-            $this->load->model('query','',TRUE);
-            
-            $tinypng = $this->query->option('tinypng');
-            $data['switch'] = $tinypng->switch;
-            if($data['switch'] == 'OFF'){
-                $data['switch'] = '';
-            }
-            else{
-                $data['switch'] = 'checked';
-            }
-            
-            $data['values'] = json_decode($tinypng->values);
-
-            //var_dump($data['values']->api1);
-            //exit;
-            
-            //加载视图
-            $this->load->view('admin/header',$data);
-            $this->load->view('admin/left');
-            $this->load->view('admin/tinypng',$data);
-            $this->load->view('admin/footer');
-        }
-        //图片鉴黄
-        public function identify(){
-            //页面标题
-            $data['admin_title']  =   '图片鉴黄';
-            //加载模型
-            $this->load->model('query','',TRUE);
-            $moderate = $this->query->option('moderate');
-
-            $data['switch'] = $moderate->switch;
-            $data['values'] = $moderate->values;
-            if($data['switch'] == 'OFF'){
-                $data['switch'] = '';
-            }
-            else{
-                $data['switch'] = 'checked';
-            }
-            
-            //加载视图
-            $this->load->view('admin/header',$data);
-            $this->load->view('admin/left');
-            $this->load->view('admin/identify');
-            $this->load->view('admin/footer');
-        }
     }
 ?>

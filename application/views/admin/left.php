@@ -16,33 +16,6 @@
           <dl class="layui-nav-child">
             <dd><a href="/setting/site">站点设置</a></dd>
             <dd><a href="/setting/uplimit">上传限制</a></dd>
-            <dd><a href="/setting/compress">图片压缩</a></dd>
-            <dd><a href="/setting/identify">图片鉴黄</a></dd>
-          </dl>
-        </li>
-        <li class="layui-nav-item">
-          <a href="javascript:;"><i class="layui-icon layui-icon-app"></i> 存储方案</a>
-          <dl class="layui-nav-child">
-            <dd><a href="/storage/localhost">localhost</a></dd>
-            <!-- <dd><a href="javascript:;">FTP</a></dd> -->
-            <!-- <dd><a href="">七牛云</a></dd>
-            <dd><a href="">又拍云</a></dd>
-            <dd><a href="">腾讯COS</a></dd>
-            <dd><a href="">阿里OSS</a></dd> -->
-          </dl>
-		</li>
-		<li class="layui-nav-item">
-          <a href="javascript:;"><i class="layui-icon layui-icon-app"></i> 管理维护</a>
-          <dl class="layui-nav-child">
-          <dd><a href="javascript:;" onclick = "version()">当前版本</a></dd>
-          <dd><a href="/maintain/upto2">1.x升级2.x</a></dd>
-          <dd><a href="/maintain/upgrade">版本升级</a></dd>
-			<!-- <dd><a href="/maintain/upto2">检查更新</a></dd> -->
-            <!-- <dd><a href="javascript:;">FTP</a></dd> -->
-            <!-- <dd><a href="">七牛云</a></dd>
-            <dd><a href="">又拍云</a></dd>
-            <dd><a href="">腾讯COS</a></dd>
-            <dd><a href="">阿里OSS</a></dd> -->
           </dl>
         </li>
       </ul>

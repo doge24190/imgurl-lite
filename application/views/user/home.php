@@ -112,21 +112,6 @@
                 $("#markdown").val("![](" + res.url + ")");
                 $("#bbcode").val("[img]" + res.url + "[/img]");
                 $("#imgshow").show();
-
-                //对图片进行鉴黄识别
-                $.get("/deal/identify/" + res.id,function(data,status){
-                    var re = JSON.parse(data);
-                    //状态码为400，说明该图片存在异常
-                    if(re.code == 400){
-                        layer.open({
-                            title: '警告！'
-                            ,content: '您的IP已被记录，请不要上传违规图片！'
-                        }); 
-                    }
-                    else{
-                        console.log(re.code);
-                    }
-                });
 	        }
 	        else{
 		        layer.msg(res.msg);
