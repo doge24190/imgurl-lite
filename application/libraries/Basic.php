@@ -101,8 +101,6 @@
             $data['admin']  =   $this->CI->query->count_num('admin')->num;
             //游客上传总数
             $data['visitor']  =   $this->CI->query->count_num('visitor')->num;
-            //可疑图片总数
-            $data['dubious']  =   $this->CI->query->count_num('dubious')->num;
 
             return $data;
         }

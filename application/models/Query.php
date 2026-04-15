@@ -96,19 +96,6 @@
                 return false;
             }
         }
-        //查询tinypng设置
-        public function tinypng(){
-            $sql = "SELECT * FROM `img_options` WHERE `name` = 'tinypng' LIMIT 1";
-            @$query = $this->db->query($sql);
-            
-            if($query){
-                $row = $query->row();
-                return $row;
-            }
-            else{
-                return FALSE;
-            }
-        }
         //查询站点信息
         public function site_setting($type = ''){
             $sql = "SELECT * FROM 'img_options' WHERE name = 'site_setting' LIMIT 1";
@@ -206,19 +193,6 @@
             $query = $query->result_array();
             return $query;
         }
-        //查询存储引擎
-        public function storage($name){
-            $sql = "SELECT * FROM `img_storage` WHERE `engine` = '$name' LIMIT 1";
-
-            $query = $this->db->query($sql);
-            if($query){
-                $row = $query->row();
-                return $row;
-            }
-            else{
-                return FALSE;
-            }
-        }
         //统计数量
         public function count_num($type){
             switch ($type) {
@@ -227,9 +201,6 @@
                     break;
                 case 'visitor':
                     $sql = "SELECT count(*) AS num FROM `img_images` WHERE `user` = 'visitor'";
-                    break;
-                case 'dubious':
-                    $sql = "SELECT count(*) AS num FROM `img_images` WHERE `level` = 'adult'";
                     break;
                 case 'day':
                     $sql = "SELECT count(*) AS num FROM `img_images` WHERE date LIKE date('now') || '%'";

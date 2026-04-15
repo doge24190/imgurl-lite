@@ -8,7 +8,6 @@
             <dd><a href="/manage/images/all/0">所有图片</a></dd>
 			<dd><a href="/manage/images/admin/0">管理员上传</a></dd>
 			<dd><a href="/manage/images/visitor/0">游客上传</a></dd>
-			<dd><a href="/manage/images/dubious/0">可疑图片</a></dd>
           </dl>
         </li>
         <li class="layui-nav-item layui-nav-itemed">

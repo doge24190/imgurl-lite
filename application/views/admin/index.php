@@ -21,12 +21,6 @@
 		</div>
 		<div class="layui-col-lg3">
 			<div class = "analyze">
-				<h3><i class="fa fa-question"></i> 可疑图片</h3>
-				<p><?php echo $dubious; ?>张</p>
-			</div>
-		</div>
-		<div class="layui-col-lg3">
-			<div class = "analyze">
 				<h3><i class="fa fa-calendar-check-o"></i> 本月上传</h3>
 				<p><?php echo $month; ?>张</p>
 			</div>

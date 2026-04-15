@@ -53,19 +53,6 @@ layui.use(['form','element','layer','laydate'], function(){
 		console.log(data.field) //当前容器的全部表单字段，名值对形式：{name: value}
 		// return false;
 	});
-	//tinypng设置表单
-	form.on('submit(formtiny)', function(data){
-		// console.log(data.field)
-		//  return false; //阻止表单跳转。如果需要表单跳转，去掉这段即可。
-	});
-	//启用鉴黄按钮
-	form.on('submit(formModerate)', function(data){
-		
-	});
-	//更新localhost
-	form.on('submit(formlocalhost)', function(data){
-		
-	});
 });
 
 //下面是同步执行
@@ -161,42 +148,6 @@ function del_img(id,imgid,path,thumbnail_path){
     layer.close(index);
     });
 }
-//压缩图片
-function compress(id){
-	//加载中
-	var index = layer.load();
-	$.get("/deal/compress/" + id,function(data,status){
-		re = JSON.parse(data);
-		if(re.code == 200){
-			layer.close(index); 
-			layer.msg(re.msg);
-		}
-		else if(re.code == 0){
-			layer.close(index); 
-			layer.msg(re.msg);
-		}
-		else{
-			layer.close(index); 
-			layer.msg(data);
-		}
-	});
-}
-//取消图片可疑状态
-function cancel(id){
-	layer.confirm('确定取消可疑状态？', {icon: 3, title:'温馨提示！'}, function(index){
-        $.get("/set/cancel/" + id,function(data,status){
-			var re = JSON.parse(data);
-            if(re.code == 200) {
-                layer.msg('操作成功，请手动刷新页面！');
-            }
-            else{
-                layer.msg(data);
-            }
-        });
-    
-    layer.close(index);
-    });
-}
 //删除多张图片
 function del_more(){
 	var chkIds = "";  
@@ -222,16 +173,6 @@ function del_more(){
     });
 	
 }
-//查看当前版本
-function version(){
-	layer.open({
-		title:'当前版本：',
-		area: ['240px', '100px'],
-		type: 2, 
-		content: '/maintain/version' //这里content是一个URL，如果你不想让iframe出现滚动条，你还可以content: ['http://sentsin.com', 'no']
-	}); 
-}
-
 //全选按钮
 $("#checkAll").click(function() {
 	if (this.checked) {
