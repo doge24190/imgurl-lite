@@ -24,7 +24,7 @@ class Insert extends CI_Model {
         return $id;
     }
 
-    // 旧方法先保留，等 Upload.php 全部切过去再删
+    // 旧方法
     public function images($datas){
         if($this->db->insert('images', $datas)){
             return $this->db->insert_id();
