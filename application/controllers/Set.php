@@ -65,6 +65,13 @@
             @$imgid  = $this->input->post('imgid',TRUE);
             @$path   = $this->input->post('path',TRUE);
             @$thumbnail_path = $this->input->post('thumbnail_path',TRUE);
+            //判断文件是否存在
+            if (is_file($path)) {
+                unlink($path);
+            }
+            if (is_file($thumbnail_path) && $thumbnail_path !== $path) {
+                unlink($thumbnail_path);
+            }
             //加载数据库模型
             $this->load->model('delete','',TRUE);
             //从数据库中删除
