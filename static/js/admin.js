@@ -75,7 +75,7 @@ function urlup(){
 			async : true, 
 			success : function(data){  
 				var re = JSON.parse(data);
-				remsg += re.msg + "\n";
+				remsg += (re.url || re.msg || '') + "\n";
 				$("#urlupmsg").val(remsg);
 			}  
 		});
