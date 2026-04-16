@@ -111,6 +111,7 @@
                 $("#html").val("<img src = '" + res.url + "' />");
                 $("#markdown").val("![](" + res.url + ")");
                 $("#bbcode").val("[img]" + res.url + "[/img]");
+                $("#dlink").val(res.delete);
                 $("#imgshow").show();
 	        }
 	        else{
