@@ -13,7 +13,13 @@
 				<div class = "layui-col-lg12">
 					Copyright © 2017-2016 Powered by <a href="https://imgurl.org/" target = "_blank" title = "ImgURL是一个开源免费的图床程序">ImgURL</a> | Edited by <a href="https://www.doge24190.top/" target = "_blank" title = "狗窝">doge24190.top</a> | 
 					<!-- 简单判断用户是否登录 -->
-					<?php if((isset($_COOKIE['user'])) && (isset($_COOKIE['token']))){ ?>
+					<?php
+					$CI =& get_instance();
+					$CI->load->library('basic');
+					$is_login = $CI->basic->is_login(FALSE);
+					?>
+
+					<?php if($is_login){ ?>
 						<a href="/user/logout">logout</a>
 					<?php }else{ ?>
 						<a href="/user/login">login</a>

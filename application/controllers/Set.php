@@ -32,9 +32,8 @@
             
             //如果更新成功
             if($this->update->site('site_setting',$data)){
-                $ref = $_SERVER["HTTP_REFERER"];
-                echo '更新成功，3s后返回上一页！';
-                header("Refresh:3;url=$ref");
+                $ref = isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : '/setting/site';
+                $this->delayed_redirect('更新成功，3 秒后返回上一页！', $ref, 3);
             }
             else{
                 echo '更新发生错误!';
@@ -50,9 +49,8 @@
             
             //如果更新成功
             if($this->update->site('uplimit',$data)){
-                $ref = $_SERVER["HTTP_REFERER"];
-                echo '更新成功，3s后返回上一页！';
-                header("Refresh:3;url=$ref");
+                $ref = isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : '/setting/uplimit';
+                $this->delayed_redirect('更新成功，3 秒后返回上一页！', $ref, 3);
             }
             else{
                 echo '更新发生错误!';
@@ -114,6 +112,25 @@
             );
             $info = json_encode($arr);
             echo $info;
+        }
+        //手动跳转
+        protected function delayed_redirect($msg, $url, $seconds = 3){
+            $msg = htmlspecialchars($msg, ENT_QUOTES, 'UTF-8');
+            $url = $url ?: '/admin/';
+
+            echo '<!doctype html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta http-equiv="refresh" content="' . (int)$seconds . ';url=' . $url . '">
+                <title>提示</title>
+            </head>
+            <body>
+                <p>' . $msg . '</p>
+                <p>' . (int)$seconds . ' 秒后自动跳转，若未跳转请 <a href="' . $url . '">点击这里</a>。</p>
+            </body>
+            </html>';
+                exit;
         }
     }
 ?>

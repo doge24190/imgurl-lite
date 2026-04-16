@@ -68,15 +68,15 @@
             }
         }
         public function logout(){
-            echo '您已退出，将在3s后返回首页！';
             $this->clean_cookies();
-            header("Refresh:3;url=/");
-            exit;
+            $this->delayed_redirect('您已退出，将在 3 秒后返回首页！', '/', 3);
         }
         //清除COOKIE
         protected function clean_cookies(){
-            setcookie("user", '', time()-3600,"/");
-            setcookie("token", '', time()-3600,"/");
+            setcookie("user", '', time() - 3600, "/");
+            setcookie("token", '', time() - 3600, "/");
+
+            unset($_COOKIE['user'], $_COOKIE['token']);
         }
         //错误消息
         protected function err_msg($msg){
@@ -109,6 +109,25 @@
                 $this->load->view('user/resetpass.php');
                 $this->load->view('user/footer.php');
             }
+        }
+        //手动跳转
+        protected function delayed_redirect($msg, $url, $seconds = 3){
+            $msg = htmlspecialchars($msg, ENT_QUOTES, 'UTF-8');
+            $url = $url ?: '/';
+
+            echo '<!doctype html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta http-equiv="refresh" content="' . (int)$seconds . ';url=' . $url . '">
+                <title>提示</title>
+            </head>
+            <body>
+                <p>' . $msg . '</p>
+                <p>' . (int)$seconds . ' 秒后自动跳转，若未跳转请 <a href="' . $url . '">点击这里</a>。</p>
+            </body>
+            </html>';
+                exit;
         }
     }
 ?>
