@@ -161,16 +161,23 @@
         }
 
         $picData = $this->basic->dl_pic($url);
-        if (!$picData) {
+        if ($picData === false || $picData === '') {
             $this->error_msg('远程图片下载失败！');
         }
 
         $tmpName = $this->temp . md5($url . microtime(true));
-        file_put_contents($tmpName, $picData);
+        if (file_put_contents($tmpName, $picData) === false) {
+            $this->error_msg('临时文件写入失败！');
+        }
 
-        $clientName = basename(parse_url($url, PHP_URL_PATH));
-        if ($clientName === '' || $clientName === false) {
+        $urlPath = parse_url($url, PHP_URL_PATH);
+        if (!is_string($urlPath) || $urlPath === '') {
             $clientName = 'remote-file';
+        } else {
+            $clientName = basename($urlPath);
+            if ($clientName === '' || $clientName === '.' || $clientName === '/') {
+                $clientName = 'remote-file';
+            }
         }
 
         $this->finalizeUpload($tmpName, $clientName);
