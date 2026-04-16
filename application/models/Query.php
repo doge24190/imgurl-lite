@@ -26,75 +26,40 @@
         }
         //查询是否重复
         public function repeat($imgid){
-            $sql = "SELECT * FROM img_images WHERE `imgid` = '$imgid'";
-
-            $query = $this->db->query($sql);
-            if($query){
-                $row = $query->row();
-                //var_dump($domain);
-                return $row;
-            }
-            else{
-                return false;
-            }
+            return $this->db
+                ->where('imgid', $imgid)
+                ->get('images')
+                ->row();
         }
         //根据ID查询1张图片
         public function onepic($imgid){
-            $sql = "SELECT * FROM img_images WHERE `imgid` = '$imgid'";
-
-            $query = $this->db->query($sql);
-            if($query){
-                $row = $query->row();
-                //var_dump($domain);
-                return $row;
-            }
-            else{
-                return false;
-            }
+            return $this->db
+                ->where('imgid', $imgid)
+                ->get('images')
+                ->row();
         }
         public function img($id){
-            $id = strip_tags($id);
             $id = (int)$id;
-            $sql = "SELECT * FROM img_images WHERE `id` = '$id'";
-
-            $query = $this->db->query($sql);
-            if($query){
-                $row = $query->row();
-                //var_dump($domain);
-                return $row;
-            }
-            else{
-                return false;
-            }
+            return $this->db
+                ->where('id', $id)
+                ->get('images')
+                ->row();
         }
         //查询图片信息
         public function imginfo($imgid){
-            $sql = "SELECT * FROM img_imginfo WHERE `imgid` = '$imgid'";
-
-            $query = $this->db->query($sql);
-            if($query){
-                $row = $query->row();
-                //var_dump($domain);
-                return $row;
-            }
-            else{
-                return false;
-            }
+            return $this->db
+                ->where('imgid', $imgid)
+                ->get('imginfo')
+                ->row();
         }
+
         //查询用户信息
         public function userinfo(){
-            $sql = "SELECT * FROM `img_options` WHERE `name` = 'userinfo' LIMIT 1";
-            
-            $query = $this->db->query($sql);
-
-            if($query){
-                $row = $query->row();
-                
-                return $row;
-            }
-            else{
-                return false;
-            }
+            return $this->db
+                ->where('name', 'userinfo')
+                ->limit(1)
+                ->get('options')
+                ->row();
         }
         //查询站点信息
         public function site_setting($type = ''){
@@ -141,18 +106,13 @@
         }
         //查询各种设置
         public function option($name){
-            $sql = "SELECT * FROM 'img_options' WHERE name = '$name' LIMIT 1";
-            $query = $this->db->query($sql);
-
-            if($query){
-                $row = $query->row();
-                
-                return $row;
-            }
-            else{
-                return FALSE;
-            }
+            return $this->db
+                ->where('name', $name)
+                ->limit(1)
+                ->get('options')
+                ->row();
         }
+
         //查询上传数量限制,传入参数IP
         public function uplimit($ip){
             // 先读上传限制配置
@@ -337,10 +297,13 @@
         }
         //根据token查询图片信息
         public function get_token($value){
-           //先获取img id
-           $sql = "SELECT a.*,b.mime,b.width,b.height,b.views,b.ext,b.client_name FROM img_images AS a INNER JOIN img_imginfo AS b ON a.token = '{$value}' AND a.imgid = b.imgid";
-           $imginfo = $this->db->query($sql)->row();
-           return $imginfo;
+            return $this->db
+                ->select('a.*,b.mime,b.width,b.height,b.views,b.ext,b.client_name')
+                ->from('images AS a')
+                ->join('imginfo AS b', 'a.imgid = b.imgid', 'inner')
+                ->where('a.token', $value)
+                ->get()
+                ->row();
         }
         //获取上传限制
         public function get_limit(){

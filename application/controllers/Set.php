@@ -72,23 +72,39 @@
             if (is_file($thumbnail_path) && $thumbnail_path !== $path) {
                 unlink($thumbnail_path);
             }
-            //加载数据库模型
-            $this->load->model('delete','',TRUE);
-            //从数据库中删除
-            $this->delete->del_img($imgid);
-            //从磁盘中删除
-            $path = FCPATH.$path;
-            $thumbnail_path = FCPATH.$thumbnail_path;
-            //缩略图地址
-            unlink($path);
-            unlink($thumbnail_path);
+            if ($imgid === '' || strlen($imgid) !== 16) {
+                echo json_encode(array(
+                    "code" => 0,
+                    "msg" => "无效的图片ID"
+                ));
+                return;
+            }
+            if ($path === '') {
+                echo json_encode(array(
+                    "code" => 0,
+                    "msg" => "图片路径不能为空"
+                ));
+                return;
+            }
 
-            $re = array(
-                "code"      =>  200,
-                "msg"       =>  "删除成功！"
-            );
-            $re = json_encode($re);
-            echo $re;
+            $this->load->model('delete', '', TRUE);
+            $this->delete->del_img($imgid);
+
+            $fullPath = FCPATH . ltrim($path, '/');
+            $thumbFullPath = FCPATH . ltrim($thumbnail_path, '/');
+
+            if (is_file($fullPath)) {
+                unlink($fullPath);
+            }
+
+            if ($thumbnail_path !== '' && $thumbFullPath !== $fullPath && is_file($thumbFullPath)) {
+                unlink($thumbFullPath);
+            }
+
+            echo json_encode(array(
+                "code" => 200,
+                "msg"  => "删除成功！"
+            ));
         }
         //操作成功返回json
         protected function suc_msg($msg){
