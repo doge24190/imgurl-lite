@@ -82,141 +82,21 @@
             $config['encrypt_name']    = TRUE;         //随机命名图片
             return $config;
         }
-        public function localhost($type = 'json'){
-            //加载上传的配置选项
-            $config = $this->config();
-            //加载上传类
-            $this->load->library('upload', $config);
+        public function localhost($type = 'json')
+        {
+        $config = $this->config($this->temp);
+        $this->load->library('upload', $config);
 
-            //上传失败
-            if ( ! $this->upload->do_upload('file'))
-            {
-                $msg = $this->upload->display_errors();
-                $msg = strip_tags($msg);
-                
-                $this->error_msg($msg);
-            }
-            else
-            {
-                $data = $this->upload->data();
-                //加载模型
-                $this->load->model('insert','',TRUE);
-                $this->load->model('query','',TRUE);
-                //计算文件MD5
-                $file_name = md5_file($data['full_path']);
-                $file_name = substr($file_name,8,16);
-                //图片唯一ID
-                $imgid = $file_name;
-                $file_name = $file_name.$data['file_ext'];
-                //新图片完整路径
-                $full_path = $this->upload_path.$file_name;
-                $full_path = str_replace("\\","/",$full_path);
-                //新图片相对路径
-                $relative_path = $this->relative_path.$file_name;
-                //缩略图相对路径
-                $thumbnail_path = $this->relative_path.$imgid.'_thumb'.$data['file_ext'];
-                //获取域名
-                $domain = $this->query->domain('localhost');
-                
-                //获取图片URL地址
-                $url = $domain.$relative_path;
-                //缩略图地址
-                $thumbnail_url  = $domain.$thumbnail_path;
-                
-                //重命名文件
-                rename($data['full_path'],$full_path);
-                
-                //生成缩略图
-                $this->load->library('image');
-                if(!$this->image->thumbnail($full_path,290,175)){
-                    //像素太小就不生产缩略图
-                    $thumbnail_url = $domain.$relative_path;
-                }
+        if (!$this->upload->do_upload('file')) {
+            $msg = strip_tags($this->upload->display_errors());
+            $this->error_msg($msg);
+        }
 
-                //CI获取获取.bmp 图片的像素，认为.bmp不是图像类型，改用其它方法获取像素
-                if( $data['file_type'] === 'image/x-ms-bmp' ){
-                    $tmpinfo = getimagesize($full_path);
-                    $data['image_width'] = $tmpinfo[0];
-                    $data['image_height'] = $tmpinfo[1];
-                }
-                //webp的图片暂时无法获取宽高，则设置为0
-                if($data['file_type'] === 'image/webp'){
-                    $data['image_width'] = 0;
-                    $data['image_height'] = 0;
-                }
-                
-                //查询图片是否上传过
-                if($imginfo = $this->query->repeat($imgid)){
-                    $id = $imginfo->id;
-                    //重组数组
-                    $info = array(
-                        "code"              =>  200,
-                        "id"                =>  $id,
-                        "imgid"             =>  $imgid,
-                        "relative_path"     =>  $relative_path,
-                        "url"               =>  $url,
-                        "thumbnail_url"     =>  $thumbnail_url,
-                        "width"             =>  $data['image_width'],
-                        "height"            =>  $data['image_height']
-                    );
-                    //$this->succeed_msg($info);
-                    //根据不同的类型返回不同的数据
-                    $this->re_data($type,$info);
-                }
-                //图片没有上传过
-                else{
-                    $arr = array(
-                        "ip"    =>  get_ip(),
-                        "ua"    =>  get_ua(),
-                        "date"  =>  $this->date
-                    );
-                    
-                    //生成token
-                    $token = $this->token($arr);
-                    //生成删除链接
-                    $delete = $this->main_domain.'/delete/'.$token;
-                    //需要插入到img_images表的数据
-                    $datas = array(
-                        "imgid"     =>  $imgid,
-                        "path"      =>  $relative_path,
-                        "thumb_path"=>  $thumbnail_path,
-                        "storage"   =>  "localhost",
-                        "ip"        =>  get_ip(),
-                        "ua"        =>  get_ua(),
-                        "date"      =>  $this->date,
-                        "user"      =>  $this->user,
-                        "level"     =>  'unknown',
-                        "token"     =>  $token
-                    );
-                    //需要插入到imginfo表的数据
-                    $imginfo = array(
-                        "imgid"     =>  $imgid,
-                        "mime"      =>  $data['file_type'],
-                        "width"     =>  $data['image_width'],
-                        "height"    =>  $data['image_height'],
-                        "ext"       =>  $data['file_ext'],
-                        "client_name"   =>  $data['client_name']
-                    );
-                    
-                    //插入数据到img_images表
-                    $id = $this->insert->images($datas);
-                    $this->insert->imginfo($imginfo);
-                    //重组数组
-                    $info = array(
-                        "code"              =>  200,
-                        "id"                =>  $id,
-                        "imgid"             =>  $imgid,
-                        "relative_path"     =>  $relative_path,
-                        "url"               =>  $url,
-                        "thumbnail_url"     =>  $thumbnail_url,
-                        "width"             =>  $data['image_width'],
-                        "height"            =>  $data['image_height'],
-                        "delete"            =>  $delete
-                    );
-                    //根据不同的类型返回不同的数据
-                    $this->re_data($type,$info);
-                }
-            }
+        $data = $this->upload->data();
+        $tmpPath = $data['full_path'];
+        $clientName = $data['client_name'];
+
+        $this->finalizeUpload($tmpPath, $clientName, $type);
         }
         //根据不同的类型返回不同的数据
         protected function re_data($type,$info){
@@ -260,210 +140,47 @@
             exit;
         }
         //URL上传
-        public function url(){
-            $url = @$this->input->post('url',TRUE);
-            $url = trim($url);
-            //检测用户是否登录
-            $this->load->library('basic');
-            $this->basic->is_login(TRUE);
-            //判断URL是否合法
-            if(!filter_var($url, FILTER_VALIDATE_URL)){
-                $this->error_msg('不是有效的URL地址！');
-            }
-            //继续执行
-            //获取图片后缀名
-            $url_arr = explode('.',$url);
-            $ext = strtolower(end($url_arr));
+        public function url()
+    {
+        $url = trim((string)$this->input->post('url', TRUE));
+        $this->load->library('basic');
+        $this->basic->is_login(TRUE);
 
-
-            //判断是否是允许的后缀
-            switch($ext){
-                case 'png':
-                case 'jpg':
-                case 'jpeg':
-                case 'bmp':
-                case 'gif':
-                case 'bmp':
-                    break;
-                default:
-                    $this->error_msg('不是有效的图片地址！');
-                    exit;
-            }
-            
-            //继续执行
-            //下载图片
-            $pic_data = $this->basic->dl_pic($url);
-            //临时文件路径
-            $tmp_name = $this->temp.md5($url);
-            //写入临时文件
-            file_put_contents($tmp_name,$pic_data);
-            //计算文件MD5
-            $imgid = md5_file($tmp_name);
-            $imgid = substr($imgid,8,16);
-            $file_name = $imgid.'.'.$ext;
-            //图片相对路径
-            $relative_path = $this->relative_path.$file_name;
-            $ext = '.'.$ext;
-            //查询图片是否已经上传过
-            if($this->query->repeat($imgid)){
-                //删除临时文件
-                unlink($tmp_name);
-                $this->error_msg('文件已经上传过！');
-                exit;
-            }
-            //没有上传过继续执行
-            //复制图片到上传目录
-            $full_path = $this->upload_path.$file_name;
-            copy($tmp_name,$full_path);
-            //删除临时文件
-            unlink($tmp_name);
-            //生成缩略图
-            $this->load->library('image');
-            $this->image->thumbnail($full_path,290,175); 
-
-            //获取图片信息
-            $img_info = getimagesize($full_path);
-            //缩略图相对地址
-            $thumbnail_path = $this->relative_path.$imgid.'_thumb'.$ext;
-
-            //需要插入到images表的数据
-            $datas = array(
-                "imgid"     =>  $imgid,
-                "path"      =>  $relative_path,
-                "thumb_path"=>  $thumbnail_path,
-                "storage"   =>  "localhost",
-                "ip"        =>  get_ip(),
-                "ua"        =>  get_ua(),
-                "date"      =>  $this->date,
-                "user"      =>  $this->user,
-                "level"     =>  'unknown'
-            );
-            //需要插入到imginfo表的数据
-            $imginfo = array(
-                "imgid"     =>  $imgid,
-                "mime"      =>  $img_info['mime'],
-                "width"     =>  $img_info[0],
-                "height"    =>  $img_info[1],
-                "ext"       =>  $ext,
-                "client_name"   =>  $file_name
-            );
-            //加载数据库模型
-            $this->load->model('insert','',TRUE);
-            //插入数据到img_images表
-            $id = $this->insert->images($datas);
-            $this->insert->imginfo($imginfo);
-            //获取域名
-            $domain = $this->query->domain('localhost');  
-            //获取图片URL地址
-            $url = $domain.$relative_path;
-            //返回成功的信息
-            $re = array(
-                "code"  =>  200,
-                "msg"   =>  $url
-            );
-            $re = json_encode($re);
-            echo $re;
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $this->error_msg('不是有效的URL地址！');
         }
+
+        $picData = $this->basic->dl_pic($url);
+        if (!$picData) {
+            $this->error_msg('远程图片下载失败！');
+        }
+
+        $tmpName = $this->temp . md5($url . microtime(true));
+        file_put_contents($tmpName, $picData);
+
+        $clientName = basename(parse_url($url, PHP_URL_PATH));
+        if ($clientName === '' || $clientName === false) {
+            $clientName = 'remote-file';
+        }
+
+        $this->finalizeUpload($tmpName, $clientName);
+    }
         //粘贴上传
-        public function parse(){
-            $date = date('Y-m-d H:i:s',time());
-            //临时文件名
-            $tmp_name = get_ip().get_ua().$date;
-            $tmp_name = md5($tmp_name);
-            //图片临时路径
-            $tmp_file = $this->temp.$tmp_name;
-            //接接收ase64图片
-            $picfile = $_POST['content'];
-            $picfile = base64_decode($picfile);
-            //echo $picfile;
-            //存储图片
-            file_put_contents($tmp_file, $picfile);
+        public function parse()
+    {
+        $date = date('Y-m-d H:i:s', time());
+        $tmpName = md5(get_ip() . get_ua() . $date);
+        $tmpFile = $this->temp . $tmpName;
 
-            //判断图片MIME类型
-            if(!mime($tmp_file)){
-                unlink($tmp_file);
-                $this->error_msg('不允许的文件类型！');
-                exit;
-            }
-            //继续执行
-            //计算文件MD5
-            $imgid = md5_file($tmp_file);
-            $imgid = substr($imgid,8,16);
-            //获取文件后缀
-            $ext = ext($tmp_file);
-            $file_name = $imgid.$ext;
-            //图片相对路径
-            $relative_path = $this->relative_path.$file_name;
-            //图片完整路径
-            $full_path = $this->upload_path.$file_name;
-            //查询图片是否已经上传过
-            if($this->query->repeat($imgid)){
-                //删除临时文件
-                unlink($tmp_file);
-                $this->error_msg('文件已经上传过！');
-                exit;
-            }
-            //没有上传过继续执行
-            //复制图片到上传目录
-            copy($tmp_file,$full_path);
-            $file_name = $imgid.$ext;
-            //删除临时文件
-            unlink($tmp_file);
-            //生成缩略图
-            $this->load->library('image');
-            $this->image->thumbnail($full_path,290,175);
-            //缩略图地址
-            $thumbnail_path = $this->relative_path.$imgid.'_thumb.'.$ext;
-
-            //获取图片信息
-            $img_info = getimagesize($full_path);
-
-            //需要插入到images表的数据
-            $datas = array(
-                "imgid"     =>  $imgid,
-                "path"      =>  $relative_path,
-                "thumb_path"=>  $thumbnail_path,
-                "storage"   =>  "localhost",
-                "ip"        =>  get_ip(),
-                "ua"        =>  get_ua(),
-                "date"      =>  $this->date,
-                "user"      =>  $this->user,
-                "level"     =>  'unknown'
-            );
-            //需要插入到imginfo表的数据
-            $imginfo = array(
-                "imgid"     =>  $imgid,
-                "mime"      =>  $img_info['mime'],
-                "width"     =>  $img_info[0],
-                "height"    =>  $img_info[1],
-                "ext"       =>  $ext,
-                "client_name"   =>  $file_name
-            );
-            //加载数据库模型
-            $this->load->model('insert','',TRUE);
-            //插入数据到img_images表
-            $id = $this->insert->images($datas);
-            $this->insert->imginfo($imginfo);
-            //获取域名
-            $domain = $this->query->domain('localhost');  
-            //获取图片URL地址
-            $url = $domain.$relative_path;
-            $thumbnail_url = $domain.$this->relative_path.$imgid.'_thumb'.$ext;
-            //返回成功的信息
-            //重组数组
-            $info = array(
-                "code"              =>  200,
-                "id"                =>  $id,
-                "imgid"             =>  $imgid,
-                "relative_path"     =>  $relative_path,
-                "url"               =>  $url,
-                "thumbnail_url"     =>  $thumbnail_url,
-                "width"             =>  $img_info[0],
-                "height"            =>  $img_info[1]
-            );
-            $this->succeed_msg($info);
-            //echo $re;
+        $picfile = isset($_POST['content']) ? base64_decode($_POST['content']) : false;
+        if ($picfile === false) {
+            $this->error_msg('粘贴内容解析失败！');
         }
+
+        file_put_contents($tmpFile, $picfile);
+
+        $this->finalizeUpload($tmpFile, $tmpName);
+    }
         /*
         1. 该方法生成图片的唯一删除token
         2. 参数为一个数组，内容为IP/UA/DATE
@@ -481,5 +198,124 @@
             $token = substr($token, 8, 16);
             return $token;
         }
+        /*
+        1. 先拿到一个临时文件，就都走这一条收口
+        */
+        protected function finalizeUpload(string $tmpPath, string $clientName, string $type = 'json')
+{
+    if (!is_file($tmpPath)) {
+        $this->error_msg('上传文件不存在！');
+    }
+
+    if (!mime($tmpPath)) {
+        @unlink($tmpPath);
+        $this->error_msg('不允许的文件类型！');
+    }
+
+    $imgid = substr(md5_file($tmpPath), 8, 16);
+
+    // 查重：如果已经存在，直接返回已有信息
+    if ($imginfo = $this->query->repeat($imgid)) {
+        $ext = pathinfo($imginfo->path, PATHINFO_EXTENSION);
+        $relativePath = $imginfo->path;
+        $thumbnailPath = $imginfo->thumb_path;
+        $domain = $this->query->domain('localhost');
+
+        $payload = array(
+            'code' => 200,
+            'id' => $imginfo->id,
+            'imgid' => $imgid,
+            'relative_path' => $relativePath,
+            'url' => $domain . $relativePath,
+            'thumbnail_url' => $domain . $thumbnailPath
+        );
+
+        @unlink($tmpPath);
+        $this->re_data($type, $payload);
+    }
+
+    $ext = ext($tmpPath);
+    if ($ext === FALSE) {
+        @unlink($tmpPath);
+        $this->error_msg('无法识别文件后缀！');
+    }
+
+    $fileName = $imgid . $ext;
+    $fullPath = $this->upload_path . $fileName;
+    $relativePath = $this->relative_path . $fileName;
+
+    if (!@rename($tmpPath, $fullPath)) {
+        if (!@copy($tmpPath, $fullPath)) {
+            @unlink($tmpPath);
+            $this->error_msg('保存文件失败！');
+        }
+        @unlink($tmpPath);
+    }
+
+    $thumbnailPath = $this->relative_path . $imgid . '_thumb' . $ext;
+
+    $this->load->library('image');
+    if (!$this->image->thumbnail($fullPath, 290, 175)) {
+        $thumbnailPath = $relativePath;
+    }
+
+    $imgInfo = @getimagesize($fullPath);
+    $width = is_array($imgInfo) ? (int)$imgInfo[0] : 0;
+    $height = is_array($imgInfo) ? (int)$imgInfo[1] : 0;
+    $mimeType = is_array($imgInfo) && isset($imgInfo['mime']) ? $imgInfo['mime'] : mime_content_type($fullPath);
+
+    $tokenData = array(
+        'ip' => get_ip(),
+        'ua' => get_ua(),
+        'date' => $this->date
+    );
+    $token = $this->token($tokenData);
+
+    $imageRow = array(
+        'imgid'      => $imgid,
+        'path'       => $relativePath,
+        'thumb_path' => $thumbnailPath,
+        'storage'    => 'localhost',
+        'ip'         => get_ip(),
+        'ua'         => get_ua(),
+        'date'       => $this->date,
+        'user'       => $this->user,
+        'level'      => 'unknown',
+        'token'      => $token
+    );
+
+    $imgInfoRow = array(
+        'imgid'       => $imgid,
+        'mime'        => $mimeType,
+        'width'       => $width,
+        'height'      => $height,
+        'ext'         => $ext,
+        'client_name' => $clientName
+    );
+
+    $this->load->model('insert', '', TRUE);
+    $id = $this->insert->createImageWithInfo($imageRow, $imgInfoRow);
+
+    if ($id === false) {
+        $this->error_msg('数据库写入失败！');
+    }
+
+    $domain = $this->query->domain('localhost');
+    $delete = $this->main_domain . '/delete/' . $token;
+
+    $payload = array(
+        'code' => 200,
+        'id' => $id,
+        'imgid' => $imgid,
+        'relative_path' => $relativePath,
+        'url' => $domain . $relativePath,
+        'thumbnail_url' => $domain . $thumbnailPath,
+        'width' => $width,
+        'height' => $height,
+        'delete' => $delete
+    );
+
+    $this->re_data($type, $payload);
+}
     }
 ?>

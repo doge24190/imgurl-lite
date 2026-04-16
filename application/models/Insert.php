@@ -1,37 +1,41 @@
 <?php
-    class Insert extends CI_Model {
+class Insert extends CI_Model {
 
-        public function __construct()
-        {
-            parent::__construct();
-            // Your own constructor code
-        }
-        //插入到images表
-        public function images($datas){
-            
-            if($this->db->insert('images', $datas)){
-                
-                //如果插入成功返回ID
-                return $this->db->insert_id();
-            }
-            else{
-                return false;
-                exit;
-                
-            }
-        }
-        //插入到imginfo表
-        public function imginfo($datas){
-            if($this->db->insert('imginfo', $datas)){
-                
-                //如果插入成功返回ID
-                return $this->db->insert_id();
-            }
-            else{
-                return false;
-                exit;
-            }
-        }
-        
+    public function __construct()
+    {
+        parent::__construct();
     }
-?>
+
+    public function createImageWithInfo(array $imageRow, array $imgInfoRow)
+    {
+        $this->db->trans_start();
+
+        $this->db->insert('images', $imageRow);
+        $id = $this->db->insert_id();
+
+        $this->db->insert('imginfo', $imgInfoRow);
+
+        $this->db->trans_complete();
+
+        if ($this->db->trans_status() === FALSE) {
+            return false;
+        }
+
+        return $id;
+    }
+
+    // 旧方法先保留，等 Upload.php 全部切过去再删
+    public function images($datas){
+        if($this->db->insert('images', $datas)){
+            return $this->db->insert_id();
+        }
+        return false;
+    }
+
+    public function imginfo($datas){
+        if($this->db->insert('imginfo', $datas)){
+            return $this->db->insert_id();
+        }
+        return false;
+    }
+}
