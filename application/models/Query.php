@@ -155,33 +155,40 @@
         }
         //查询上传数量限制,传入参数IP
         public function uplimit($ip){
-            //获取今天的日期
-            $date = date('Y-m-d',time());
-            $date = $date.'%';
-            //查询出今天上传的数量
-            $sql = "select count(*) num from img_images where `ip` = '$ip' AND `user` = 'visitor' AND `date` LIKE '$date'";
+            // 先读上传限制配置
+            $sql = "SELECT `values` FROM img_options WHERE `name` = 'uplimit' LIMIT 1";
             $query = $this->db->query($sql);
-            //获取用户已经上传的数量
-            $num = (int)$query->row()->num;
-            // var_dump($num);
-             
-            //  exit;
-            //查询系统限制的条数
-            $sql = "SELECT * FROM 'img_options' WHERE name = 'uplimit' LIMIT 1";
-            $query = $this->db->query($sql);
-            $limit = $query->row();
-            $limit = $limit->values;
-            $limit = json_decode($limit);
-            $limit = $limit->limit;
-            
-            //进行判断
-            //上传达到限制了，返回FALSE
-            if($num >= $limit){
-                return FALSE;
-            }
-            else{
+            $row = $query ? $query->row() : null;
+
+            // 没有配置就视为不限
+            if (!$row || empty($row->values)) {
                 return TRUE;
             }
+
+            $cfg = json_decode($row->values);
+
+            // 配置损坏也视为不限，避免 warning 污染 JSON 响应
+            if (!$cfg || !isset($cfg->limit)) {
+                return TRUE;
+            }
+
+            $limit = (int)$cfg->limit;
+
+            // 0 或负数都视为“不限制”
+            if ($limit <= 0) {
+                return TRUE;
+            }
+
+            $date = date('Y-m-d') . '%';
+            $sql = "SELECT count(*) AS num
+                    FROM img_images
+                    WHERE `ip` = ?
+                    AND `user` = 'visitor'
+                    AND `date` LIKE ?";
+            $query = $this->db->query($sql, array($ip, $date));
+            $num = $query ? (int)$query->row()->num : 0;
+
+            return $num < $limit;
         }
         //查询图片完整信息，用于探索发现,$num为要查询的图片数量
         public function found($num){
