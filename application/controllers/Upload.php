@@ -32,11 +32,15 @@
             $this->upload_path = str_replace('\\','/',$this->upload_path);
             $this->relative_path = "/imgs/".date('Y',time()).'/'.date('m',time()).'/';
             $this->relative_path = str_replace('\\','/',$this->relative_path);
-            $this->temp = FCPATH.'data/temp/';
+            $this->temp = str_replace('\\', '/', FCPATH . 'data/temp/');
             //如果文件夹不存在，则创建文件夹
             if(!is_dir($this->upload_path)){
                 //递归模式创建目录
                 mkdir($this->upload_path,0777,TRUE);
+            }
+            //保证 $this->temp 存在
+            if (!is_dir($this->temp)) {
+                mkdir($this->temp, 0777, TRUE);
             }
             $this->date = date('Y-m-d H:i',time());
             //加载辅助函数
@@ -172,7 +176,18 @@
         $tmpName = md5(get_ip() . get_ua() . $date);
         $tmpFile = $this->temp . $tmpName;
 
-        $picfile = isset($_POST['content']) ? base64_decode($_POST['content']) : false;
+        $content = isset($_POST['content']) ? $_POST['content'] : '';
+
+        if ($content === '') {
+            $this->error_msg('粘贴内容为空！');
+        }
+
+        if (strpos($content, 'base64,') !== false) {
+            $content = substr($content, strpos($content, 'base64,') + 7);
+        }
+
+        $picfile = base64_decode($content, true);
+
         if ($picfile === false) {
             $this->error_msg('粘贴内容解析失败！');
         }
