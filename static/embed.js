@@ -70,8 +70,6 @@ layui.use(['upload','form','element','layer','flow'], function(){
                     $("#bbcode").val("[img]" + res.url + "[/img]");
                     $("#dlink").val(res.delete);
                     $("#imgshow").show();
-                    //对图片进行鉴黄识别
-                    identify(res.id);
                 }
 			}
 			,error: function(){
@@ -113,8 +111,6 @@ layui.use(['upload','form','element','layer','flow'], function(){
                     //得到百分比
                     //var col = (n / total) * 100;
                     multiple(res.url,res.delete);
-                    //对图片进行鉴黄识别
-                    identify(res.id);
                     //element.progress('up-status', col + '%');
                 }
                 else if(res.code == 0){
