@@ -66,24 +66,30 @@
         }
         //通用上传设置
         protected function config($upload_path = ''){
-            //获取上传限制
-            $limit = $this->query->get_limit();
-            $limit = json_decode($limit);
+            $limitRaw = $this->query->get_limit();
+            $limit = json_decode($limitRaw);
 
-            //最大上传大小
-            $max_size = $limit->max_size * 1024;
-            //设置上传路径
+            // 默认 10MB
+            $max_size = 10 * 1024;
+
+            if ($limit && isset($limit->max_size)) {
+                $tmp = (int)$limit->max_size;
+                if ($tmp > 0) {
+                    $max_size = $tmp * 1024;
+                }
+            }
+
             if($upload_path == ''){
                 $upload_path = $this->upload_path;
             }
-            // var_dump();
-            $config['upload_path']      = $upload_path;
-            $config['allowed_types']    = 'gif|jpg|jpeg|png|bmp|webp';
-            //$config['allowed_types']    = 'image/jpeg|image/png|image/gif|image/bmp|image/x-ms-bmp|image/webp';
-            $config['max_size']     = $max_size;
-            $config['file_ext_tolower'] = TRUE; //文件名转换为小写
-            $config['overwrite'] = TRUE;        //覆盖同名文件
-            $config['encrypt_name']    = TRUE;         //随机命名图片
+
+            $config['upload_path'] = $upload_path;
+            $config['allowed_types'] = 'gif|jpg|jpeg|png|bmp|webp';
+            $config['max_size'] = $max_size;
+            $config['file_ext_tolower'] = TRUE;
+            $config['overwrite'] = TRUE;
+            $config['encrypt_name'] = TRUE;
+
             return $config;
         }
         public function localhost($type = 'json')
