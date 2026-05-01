@@ -86,6 +86,10 @@
     </div>
 </div>
 <!--Ctrl + V粘贴上传-->
+<script>
+    window.IMGURL_MAX_SIZE_MB = <?php echo isset($max_size) ? (int)$max_size : 10; ?>;
+    window.IMGURL_UPLOAD_LIMIT = <?php echo isset($upload_limit) ? (int)$upload_limit : 0; ?>;
+</script>
 <script src = "/static/js/PasteUpload.js"></script>
 <script>
 	var load1 = document.querySelector("#upimg");

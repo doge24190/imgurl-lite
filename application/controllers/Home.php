@@ -22,28 +22,56 @@
             $this->load->model('query','',TRUE);
             $siteinfo = $this->query->site_setting();
             //读取配置文件内容
+            $siteinfo = json_decode($siteinfo->values);
+
             $this->load->library("basic");
             $conf = $this->basic->conf("info");
-            
-            
-            $siteinfo = json_decode($siteinfo->values);
             $siteinfo->info = $conf->index_info;
-            //echo $siteinfo->title;
-            //$data['title']  =   '图片上传';
-            $this->load->view('user/header.php',$siteinfo);
-            $this->load->view('user/home.php',$siteinfo);
+
+            $limitRaw = $this->query->get_limit();
+            $limit = json_decode($limitRaw);
+
+            $siteinfo->max_size = 10; // 默认 10MB
+            $siteinfo->upload_limit = 0; // 默认不限次数
+
+            if ($limit) {
+                if (isset($limit->max_size) && (int)$limit->max_size > 0) {
+                    $siteinfo->max_size = (int)$limit->max_size;
+                }
+                if (isset($limit->limit)) {
+                    $siteinfo->upload_limit = (int)$limit->limit;
+                }
+            }
+
+            $this->load->view('user/header.php', $siteinfo);
+            $this->load->view('user/home.php', $siteinfo);
             $this->load->view('user/footer.php');
         }
         //首页多图上传
         public function multiple(){
             //加载数据库模型
             $this->load->model('query','',TRUE);
+
             $siteinfo = $this->query->site_setting();
             $siteinfo = json_decode($siteinfo->values);
-            //echo $siteinfo->title;
-            //$data['title']  =   '图片上传';
-            $this->load->view('user/header.php',$siteinfo);
-            $this->load->view('user/multiple.php');
+
+            $limitRaw = $this->query->get_limit();
+            $limit = json_decode($limitRaw);
+
+            $siteinfo->max_size = 10; // 默认 10MB
+            $siteinfo->upload_limit = 0;
+
+            if ($limit) {
+                if (isset($limit->max_size) && (int)$limit->max_size > 0) {
+                    $siteinfo->max_size = (int)$limit->max_size;
+                }
+                if (isset($limit->limit)) {
+                    $siteinfo->upload_limit = (int)$limit->limit;
+                }
+            }
+
+            $this->load->view('user/header.php', $siteinfo);
+            $this->load->view('user/multiple.php', $siteinfo);
             $this->load->view('user/footer.php');
         }
         //更新日志

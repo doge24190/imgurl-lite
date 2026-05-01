@@ -5,7 +5,16 @@
             <div id="main">
                 <div class="alert alert-warning" role="alert">
                     <span class="alert-inner--icon"><i class="layui-icon"></i></span>
-                    <span class="alert-inner--text"><strong>注意：</strong>游客限制每日上传10张，单张图片不能超过5M，上传的图片将公开显示，使用之前请先阅读《<a href="/page/use">使用协议</a>》</span>
+                    <span class="alert-inner--text">
+                        <strong>注意：</strong>
+                        <?php if (isset($upload_limit) && (int)$upload_limit > 0) { ?>
+                            游客限制每日上传<?php echo (int)$upload_limit; ?>张，
+                        <?php } else { ?>
+                            游客上传次数不限，
+                        <?php } ?>
+                        单张图片不能超过<?php echo isset($max_size) ? (int)$max_size : 10; ?>M，
+                        上传的图片将公开显示，使用之前请先阅读《<a href="/page/use">使用协议</a>》
+                    </span>
                 </div>
                 <!-- 上传区域 -->
                 <div class="layui-form-item">
@@ -58,3 +67,8 @@
         <!-- 首页主要区域END -->
     </div>
 </div>
+
+<script>
+    window.IMGURL_MAX_SIZE_MB = <?php echo isset($max_size) ? (int)$max_size : 10; ?>;
+    window.IMGURL_UPLOAD_LIMIT = <?php echo isset($upload_limit) ? (int)$upload_limit : 0; ?>;
+</script>
