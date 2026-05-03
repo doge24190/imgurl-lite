@@ -18,29 +18,35 @@
             }
         }
         public function index(){
-            //加载数据库模型
             $this->load->model('query','',TRUE);
+
             $siteinfo = $this->query->site_setting();
-            //读取配置文件内容
             $siteinfo = json_decode($siteinfo->values);
 
             $this->load->library("basic");
-            $conf = $this->basic->conf("info");
-            $siteinfo->info = $conf->index_info;
 
+            // 读取上传限制
             $limitRaw = $this->query->get_limit();
             $limit = json_decode($limitRaw);
 
-            $siteinfo->max_size = 10; // 默认 10MB
-            $siteinfo->upload_limit = 0; // 默认不限次数
+            $siteinfo->max_size = 10;
+            $siteinfo->upload_limit = 0;
 
             if ($limit) {
                 if (isset($limit->max_size) && (int)$limit->max_size > 0) {
                     $siteinfo->max_size = (int)$limit->max_size;
                 }
+
                 if (isset($limit->limit)) {
                     $siteinfo->upload_limit = (int)$limit->limit;
                 }
+            }
+
+            // 动态首页通知
+            if ($siteinfo->upload_limit > 0) {
+                $siteinfo->info = '游客限制每日上传' . $siteinfo->upload_limit . '张，单张图片不能超过' . $siteinfo->max_size . 'MB，上传的图片将公开显示。';
+            } else {
+                $siteinfo->info = '游客上传次数不限，单张图片不能超过' . $siteinfo->max_size . 'MB，上传的图片将公开显示。';
             }
 
             $this->load->view('user/header.php', $siteinfo);

@@ -7,23 +7,6 @@
                     <span class="alert-inner--icon"><i class="layui-icon"></i></span>
                     <span class="alert-inner--text"><strong>注意：</strong><?php echo $info; ?></span>
                 </div>
-                <!-- 选择按钮 -->
-                <!-- 上传地址 -->
-                <!-- <div id = "storage">
-                    <form class="layui-form" action="">
-                    <div class="layui-form-item">
-                        <label class="layui-form-label">存储方式</label>
-                        <div class="layui-input-block">
-                        <input type="radio" name="storage" value="localhost" title="本地" checked = "checked">
-                        <input type="radio" name="storage" value="qiniu" title="七牛云">
-                        <input type="radio" name="storage" value="upyun" title="又拍云">
-                        <input type="radio" name="storage" value="oss" title="阿里OSS">
-                        </div>
-                    </div>
-                    </form>
-                </div> -->
-                <!-- 选择按钮END -->
-                <!-- 上传区域 -->
                 <div class="layui-form-item">
                 <div class="layui-upload-drag" id="upimg">
                     <i class="layui-icon"></i>
