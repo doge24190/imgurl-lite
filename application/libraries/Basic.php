@@ -18,6 +18,15 @@
             如果参数为TURE时，如果没有登录会exit终止执行
         */
         public function is_login($type = FALSE){
+            // 未安装时，不做任何数据库登录检查
+            if (!is_file(FCPATH.'data/install.lock') || !is_file(FCPATH.'data/imgurl.db3')) {
+                if ($type === FALSE) {
+                    return FALSE;
+                } else {
+                    header("location:/install/?setup=1");
+                    exit;
+                }
+            }
             //获取COOKIE信息
             @$user = $_COOKIE['user'];
             @$token = $_COOKIE['token'];
@@ -60,8 +69,12 @@
                 }
             }
             else{
-                echo '数据库查询错误！';
-                exit;
+                if ($type === FALSE) {
+                    return FALSE;
+                } else {
+                    echo '数据库查询错误！';
+                    exit;
+                }
             }
         }
         //查询上传数量限制，需要传入访客IP
