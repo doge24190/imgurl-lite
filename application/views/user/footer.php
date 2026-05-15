@@ -14,15 +14,19 @@
 					Copyright © 2017-2026 Powered by <a href="https://imgurl.org/" target = "_blank" title = "ImgURL是一个开源免费的图床程序">ImgURL</a> | Edited by <a href="https://www.doge24190.top/" target = "_blank" title = "狗窝">doge24190.top</a> | 
 					<!-- 简单判断用户是否登录 -->
 					<?php
-					$CI =& get_instance();
-					$CI->load->library('basic');
-					$is_login = $CI->basic->is_login(FALSE);
+					$is_login = FALSE;
+					$installed = is_file(FCPATH.'data/install.lock') && is_file(FCPATH.'data/imgurl.db3');
+					
+					if ($installed) {
+					    $CI =& get_instance();
+					    $CI->load->library('basic');
+					    $is_login = $CI->basic->is_login(FALSE);
+					}
 					?>
-
-					<?php if($is_login){ ?>
-						<a href="/user/logout">logout</a>
-					<?php }else{ ?>
-						<a href="/user/login">login</a>
+					<?php if ($installed && $is_login) { ?>
+					    <a href="/user/logout">logout</a>
+					<?php } elseif ($installed) { ?>
+					    <a href="/user/login">login</a>
 					<?php } ?>
 					<!-- 简单判断用户是否登录END -->
 				</div>
