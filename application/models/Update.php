@@ -21,6 +21,24 @@ class Update extends CI_Model {
         ));
     }
 
+    // 更新或创建任意 JSON 配置项
+    public function option($name, $data){
+        $exists = $this->db
+            ->where('name', $name)
+            ->limit(1)
+            ->count_all_results('options') > 0;
+
+        if($exists){
+            $this->db->where('name', $name);
+            return $this->db->update('options', array('values' => $data));
+        }
+
+        return $this->db->insert('options', array(
+            'name' => $name,
+            'values' => $data
+        ));
+    }
+
     // 更新密码
     public function password($values){
         $this->db->where('name', 'userinfo');

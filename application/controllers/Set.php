@@ -57,6 +57,35 @@
                 exit;
             } 
         }
+        //更新登录安全设置
+        public function security(){
+            $this->load->library('login_security');
+            $input = array(
+                'captcha_length' => $this->input->post('captcha_length', TRUE),
+                'captcha_ttl' => $this->input->post('captcha_ttl', TRUE),
+                'max_attempts' => $this->input->post('max_attempts', TRUE),
+                'attempt_window' => $this->input->post('attempt_window', TRUE),
+                'lockout' => $this->input->post('lockout', TRUE)
+            );
+            $validation = $this->login_security->validate_settings($input);
+
+            if( ! $validation['valid']){
+                $this->delayed_redirect(
+                    '保存失败：'.implode('；', $validation['errors']),
+                    '/setting/security',
+                    5
+                );
+                return;
+            }
+
+            $data = json_encode($validation['settings']);
+            if($this->update->option('login_security', $data)){
+                $this->delayed_redirect('登录安全设置已更新，3 秒后返回！', '/setting/security', 3);
+            }
+            else{
+                $this->delayed_redirect('保存失败，请检查数据库写入权限。', '/setting/security', 5);
+            }
+        }
         //删除单张图片,需传入图片ID，及文件路径
         public function del_img(){
             //获取数据

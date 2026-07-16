@@ -64,6 +64,44 @@ body{
 .login button{
 	width:100%;
 }
+.login .captcha-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:6px;
+}
+.login .captcha-input{
+    min-width:0;
+    flex:1;
+    text-transform:uppercase;
+    letter-spacing:0.2em;
+}
+.login .captcha-refresh{
+    width:160px;
+    height:50px;
+    padding:0;
+    border:0;
+    border-radius:3px;
+    overflow:hidden;
+    cursor:pointer;
+    background:#f4f7fa;
+}
+.login .captcha-refresh img{
+    display:block;
+    width:160px;
+    height:50px;
+}
+.login .captcha-help{
+    margin:0 0 14px;
+    color:rgba(255,255,255,0.85);
+    font-size:12px;
+    text-align:right;
+}
+@media screen and (max-width:480px) {
+    .login .captcha-refresh,
+    .login .captcha-refresh img{
+        width:130px;
+    }
+}
 #upimg{
     margin-left:auto;
     margin-right:auto;
