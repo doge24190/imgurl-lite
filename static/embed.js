@@ -160,23 +160,89 @@ function login(){
     // 获取用户提交的信息
     var user = $("#user").val();
     var password = $("#password").val();
+    var captcha = $("#captcha").val();
 
-    if((user == '') || (password == '')){
-	    layer.msg('用户名或密码不能为空！');
+    if((user == '') || (password == '') || (captcha == '')){
+	    layer.msg('用户名、密码和验证码均不能为空！');
 	    return false;
     }
 
-    $.post("/user/verify",{user:user,password:password},function(data,status){
-        var re = JSON.parse(data);
-        if(re.code == 200){
-            window.location.href = "/admin/";
+    var button = $("#login-button");
+    button.prop("disabled", true).addClass("layui-btn-disabled").text("登录中...");
+
+    $.ajax({
+        url: "/user/verify",
+        method: "POST",
+        dataType: "json",
+        data: {user:user, password:password, captcha:captcha}
+    }).done(function(re){
+        handleLoginResponse(re);
+    }).fail(function(xhr){
+        var re = xhr.responseJSON;
+        if(!re){
+            try{
+                re = JSON.parse(xhr.responseText);
+            }
+            catch(e){
+                re = {code:0, msg:'登录请求失败，请稍后重试'};
+            }
         }
-        else{
-            layer.msg(re.msg,{time:2000});
+        handleLoginResponse(re);
+    }).always(function(){
+        if(!button.data("cooldown")){
+            button.prop("disabled", false).removeClass("layui-btn-disabled").text("登录");
         }
-        //layer.msg(data,{time:2000});
     });
 }
+
+function handleLoginResponse(re){
+    if(re.code == 200){
+        window.location.href = "/admin/";
+        return;
+    }
+
+    layer.msg(re.msg || '登录失败，请重试', {time:2000});
+    $("#captcha").val("").focus();
+    if(re.refresh_captcha){
+        refreshCaptcha();
+    }
+    if(re.code == 429 && re.retry_after){
+        startLoginCooldown(parseInt(re.retry_after, 10));
+    }
+}
+
+function refreshCaptcha(){
+    var image = document.getElementById("captcha-image");
+    if(image){
+        image.src = "/user/captcha?t=" + new Date().getTime();
+    }
+}
+
+function startLoginCooldown(seconds){
+    var button = $("#login-button");
+    var remaining = Math.max(1, seconds || 1);
+    button.data("cooldown", true).prop("disabled", true).addClass("layui-btn-disabled");
+
+    function updateButton(){
+        button.text("请等待 " + remaining + " 秒");
+        remaining--;
+        if(remaining < 0){
+            clearInterval(timer);
+            button.removeData("cooldown").prop("disabled", false).removeClass("layui-btn-disabled").text("登录");
+            refreshCaptcha();
+        }
+    }
+
+    updateButton();
+    var timer = setInterval(updateButton, 1000);
+}
+
+$(document).on("keydown", "#user, #password, #captcha", function(event){
+    if(event.keyCode === 13){
+        event.preventDefault();
+        login();
+    }
+});
 
 //显示图片操作按钮
 function show_imgcon(id){
