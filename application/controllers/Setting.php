@@ -51,5 +51,20 @@
             $this->load->view('admin/uplimit');
             $this->load->view('admin/footer');
         }
+        //登录安全设置
+        public function security(){
+            $this->load->library('login_security');
+            $data = array_merge(
+                $this->login_security->get_settings(),
+                $this->login_security->get_status()
+            );
+            $siteinfo = (object)$data;
+            $siteinfo->admin_title = '登录安全';
+
+            $this->load->view('admin/header',$siteinfo);
+            $this->load->view('admin/left');
+            $this->load->view('admin/security');
+            $this->load->view('admin/footer');
+        }
     }
 ?>

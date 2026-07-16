@@ -24,14 +24,95 @@ class Login_security {
 
         $config = $this->CI->config->item('login_security');
         $this->storage_path = rtrim($config['login_security_storage_path'], '/\\');
-        $this->captcha_length = (int)$config['login_security_captcha_length'];
-        $this->captcha_ttl = (int)$config['login_security_captcha_ttl'];
-        $this->max_attempts = (int)$config['login_security_max_attempts'];
-        $this->attempt_window = (int)$config['login_security_attempt_window'];
-        $this->lockout = (int)$config['login_security_lockout'];
+        $settings = array(
+            'captcha_length' => (int)$config['login_security_captcha_length'],
+            'captcha_ttl' => (int)$config['login_security_captcha_ttl'],
+            'max_attempts' => (int)$config['login_security_max_attempts'],
+            'attempt_window' => (int)$config['login_security_attempt_window'],
+            'lockout' => (int)$config['login_security_lockout']
+        );
+        $settings = $this->load_persisted_settings($settings);
+
+        $this->captcha_length = $settings['captcha_length'];
+        $this->captcha_ttl = $settings['captcha_ttl'];
+        $this->max_attempts = $settings['max_attempts'];
+        $this->attempt_window = $settings['attempt_window'];
+        $this->lockout = $settings['lockout'];
 
         $this->ensure_storage();
         $this->secret = $this->load_secret();
+    }
+
+    /**
+     * Values that may be displayed and changed by an authenticated admin.
+     * Storage paths, signing keys and IP-derived state are intentionally not
+     * included.
+     */
+    public function get_settings(){
+        return array(
+            'captcha_length' => $this->captcha_length,
+            'captcha_ttl' => $this->captcha_ttl,
+            'max_attempts' => $this->max_attempts,
+            'attempt_window' => $this->attempt_window,
+            'lockout' => $this->lockout
+        );
+    }
+
+    /**
+     * Validate a complete settings submission from the admin panel.
+     */
+    public function validate_settings($input){
+        $settings = array();
+        $errors = array();
+
+        foreach($this->setting_rules() as $name => $rule){
+            $value = isset($input[$name])
+                ? filter_var($input[$name], FILTER_VALIDATE_INT)
+                : FALSE;
+            if($value === FALSE){
+                $errors[] = $rule['label'].'必须是整数';
+                continue;
+            }
+
+            $value = (int)$value;
+            if($value < $rule['min'] || $value > $rule['max']){
+                $errors[] = $rule['label'].'必须介于 '.$rule['min'].' 和 '.$rule['max'].' 之间';
+                continue;
+            }
+            $settings[$name] = $value;
+        }
+
+        return array(
+            'valid' => empty($errors),
+            'settings' => $settings,
+            'errors' => $errors
+        );
+    }
+
+    /**
+     * Aggregated runtime state for the admin page. No IP hash, token or secret
+     * is returned.
+     */
+    public function get_status(){
+        $records = glob($this->storage_path.'/attempt-*.json');
+        if($records === FALSE){
+            $records = array();
+        }
+
+        $locked = 0;
+        foreach($records as $path){
+            $state = json_decode((string)@file_get_contents($path), TRUE);
+            if(is_array($state) && isset($state['locked_until']) && (int)$state['locked_until'] > time()){
+                $locked++;
+            }
+        }
+
+        return array(
+            'storage_writable' => is_writable($this->storage_path),
+            'secret_initialized' => is_file($this->storage_path.'/.secret'),
+            'attempt_record_count' => count($records),
+            'locked_record_count' => $locked
+        );
     }
 
     /**
@@ -198,6 +279,57 @@ class Login_security {
         $expected = hash_hmac('sha256', strtoupper(trim((string)$answer)).'|'.$payload, $this->secret);
 
         return hash_equals($expected, $matches[5]);
+    }
+
+    protected function setting_rules(){
+        return array(
+            'captcha_length' => array('label' => '验证码长度', 'min' => 4, 'max' => 8),
+            'captcha_ttl' => array('label' => '验证码有效期', 'min' => 60, 'max' => 900),
+            'max_attempts' => array('label' => '失败次数阈值', 'min' => 3, 'max' => 20),
+            'attempt_window' => array('label' => '失败统计窗口', 'min' => 60, 'max' => 86400),
+            'lockout' => array('label' => '锁定时长', 'min' => 60, 'max' => 86400)
+        );
+    }
+
+    protected function load_persisted_settings($defaults){
+        if( ! is_file(FCPATH.'data/install.lock') || ! is_file(FCPATH.'data/imgurl.db3')){
+            return $defaults;
+        }
+
+        try{
+            $this->CI->load->database();
+            $row = $this->CI->db
+                ->where('name', 'login_security')
+                ->limit(1)
+                ->get('options')
+                ->row();
+
+            if( ! $row || empty($row->values)){
+                return $defaults;
+            }
+
+            $saved = json_decode($row->values, TRUE);
+            if( ! is_array($saved)){
+                return $defaults;
+            }
+
+            foreach($this->setting_rules() as $name => $rule){
+                $value = isset($saved[$name])
+                    ? filter_var($saved[$name], FILTER_VALIDATE_INT)
+                    : FALSE;
+                if($value !== FALSE){
+                    $value = (int)$value;
+                    if($value >= $rule['min'] && $value <= $rule['max']){
+                        $defaults[$name] = $value;
+                    }
+                }
+            }
+        }
+        catch(Exception $e){
+            log_message('error', 'Unable to load login security settings: '.$e->getMessage());
+        }
+
+        return $defaults;
     }
 
     protected function add_failure(&$state){

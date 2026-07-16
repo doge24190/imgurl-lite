@@ -25,7 +25,7 @@ ImgURL是一款简单、纯粹的图床程序，使用PHP + SQLite 3开发。
 
 ### 后台登录安全
 
-后台登录默认启用一次性图片验证码，并按客户端 IP 限制失败尝试：15 分钟内失败 5 次后暂停登录 15 分钟。验证码错误和密码错误都会计入限制，相关参数可在 `application/config/login_security.php` 中调整。
+后台登录默认启用一次性图片验证码，并按客户端 IP 限制失败尝试：15 分钟内失败 5 次后暂停登录 15 分钟。验证码错误和密码错误都会计入限制。管理员可在“系统设置 → 登录安全”中调整参数，代码中的默认值位于 `application/config/login_security.php`。
 
 限速状态和验证码签名密钥保存在可写的 `data/.login_security` 目录中。若站点位于 Nginx、CDN 等反向代理后，请在 `application/config/config.php` 的 `proxy_ips` 中仅配置可信代理地址，否则应用无法可靠识别真实客户端 IP。
 
