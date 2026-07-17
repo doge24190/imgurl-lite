@@ -1,0 +1,33 @@
+# ImgURL runtime data (Nginx + PHP-FPM)
+/data/imgurl.db3
+/data/imgurl.db3-*
+/data/install.lock
+/data/password.txt
+/data/.login_security/
+/data/temp/
+/data/json/config.js
+
+# User-uploaded images; retain the directory placeholder
+/imgs/*
+!/imgs/index.html
+
+# CodeIgniter runtime cache and logs; retain placeholders
+/application/cache/*
+!/application/cache/index.html
+/application/logs/*
+!/application/logs/index.html
+
+# Per-server configuration and local secrets
+/.user.ini
+/.env
+/.env.*
+!/.env.example
+
+# Local development files
+/.idea/
+/.vscode/
+/.DS_Store
+*.swp
+*.swo
+*~
+
