@@ -8,7 +8,7 @@
 </div>
 <div class="layui-footer">
       	<!-- 底部固定区域 -->
-      	Copyright © 2017-2019 Powered by <a href="https://imgurl.org/" target = "_blank">ImgURL</a> | Author <a href="https://www.xiaoz.me/" target = "_blank">xiaoz.me</a>
+      	Copyright © 2017-2026 Powered by <a href="https://doge24190.top/" target = "_blank">doge24190</a>
   </div>
 </div>
 <script src="/static/layui/layui.js"></script>
