@@ -1,4 +1,5 @@
 <?php
+    $version = '';
     //获取版本号
     $ver_file = FCPATH.'data/version.txt';
     if(is_file($ver_file)){
@@ -10,11 +11,14 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-	<title><?php echo $admin_title; ?> - ImgURL后台管理</title>
+	<title><?php echo h($admin_title ?? ''); ?> - ImgURL后台管理</title>
   	<link rel="stylesheet" href="/static/layui/css/layui.css">
   	<link rel="stylesheet" href="/static/font-awesome/css/font-awesome.min.css">
-	  <link rel="stylesheet" href="/static/css/admin.css?v=<?php echo $version; ?>">
+	  <link rel="stylesheet" href="/static/css/admin.css?v=<?php echo h($version ?? ''); ?>">
 	<script src = "/static/js/jquery.min.js"></script>
+<meta name="csrf-name" content="<?php echo h($this->security->get_csrf_token_name()); ?>">
+    <meta name="csrf-token" content="<?php echo h($this->security->get_csrf_hash()); ?>">
+    <script src="/static/js/csrf.js"></script>
 </head>
 <body class="layui-layout-body">
 <div class="layui-layout layui-layout-admin">
@@ -38,7 +42,7 @@
       <li class="layui-nav-item">
         <a href="javascript:;">
           <img src="/static/images/touxiang_100.jpg" class="layui-nav-img">
-          <?php echo $_COOKIE['user']; ?>
+          <?php $CI =& get_instance(); $CI->load->library('auth'); echo h($CI->auth->username()); ?>
         </a>
         <dl class="layui-nav-child">
           <dd><a href="/user/resetpass">修改密码</a></dd>

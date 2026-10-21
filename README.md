@@ -16,12 +16,17 @@ ImgURL是一款简单、纯粹的图床程序，使用PHP + SQLite 3开发。
 - [ ] 外部存储
 
 ### 环境要求
-* PHP >= 5.6
+* PHP >= 8.2
 * PDO_SQLite
 * GD2
-* ImageMagick
+* cURL、mbstring
+* ImageMagick（可选；缩略图使用 GD）
 * fileinfo
-* pathinfo
+
+
+### PHP 8.2 升级
+
+请先阅读 [升级与部署说明](docs/php82-upgrade.md)。旧版本升级后需要重新登录；旧密码会在成功登录时自动升级。后台写操作已增加 CSRF 校验，公开上传 API 保持兼容。
 
 ### 后台登录安全
 

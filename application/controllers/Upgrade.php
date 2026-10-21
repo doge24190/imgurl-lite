@@ -20,6 +20,7 @@ class Upgrade extends CI_Controller{
         $this->load->model('query','',TRUE);
     }
     public function v22_to_v23(){
+        require_post();
         //升级数据库操作
         $result = $this->query->to23();
         if($result){

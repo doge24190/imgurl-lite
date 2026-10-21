@@ -12,7 +12,7 @@
                          <input id = "password" type="password" name="password" required lay-verify="required" placeholder="密码" autocomplete="off" class="layui-input">
                     </div>
                     <div class="layui-form-item captcha-row">
-                        <input id="captcha" type="text" name="captcha" required lay-verify="required" placeholder="验证码" autocomplete="off" maxlength="5" class="layui-input captcha-input" aria-label="验证码">
+                        <input id="captcha" type="text" name="captcha" required lay-verify="required" placeholder="验证码" autocomplete="off" maxlength="8" class="layui-input captcha-input" aria-label="验证码">
                         <button type="button" class="captcha-refresh" onclick="refreshCaptcha()" title="点击更换验证码" aria-label="更换验证码">
                             <img id="captcha-image" src="/user/captcha" alt="登录验证码">
                         </button>

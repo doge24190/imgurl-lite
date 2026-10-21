@@ -12,7 +12,8 @@
         //方法映射
         public function _remap($type = 'all',$params = array())
         {
-            $page = @$params[0];
+            if ($type === 'index') { $type = 'all'; }
+            $page = $params[0] ?? 0;
             //var_dump($params);
             //exit;
             if(!isset($page)){
@@ -22,6 +23,8 @@
         }
         //探索发现页面
         public function index($type = 'all',$page = 0){
+            if (!in_array($type, ['all', 'gif', 'views', 'large'], true) || !ctype_digit((string)$page) || (int)$page >= 160) { show_404(); }
+            $page = (int)$page;
             //加载常用类
             $this->load->library('basic');
             //检测用户是否登录
@@ -43,35 +46,8 @@
             
             //出于安全性考虑，最多显示160张图片
             
-            //根据条件生成不同的SQL语句
-            switch($type){
-                case 'all':
-                    //查询游客上传图片总数
-                    $num = $this->query->count_num('visitor')->num;
-                    $num = ($num >= 160) ? 160 : $num;
-                    $config['base_url'] = "/found/all/";
-                    break;
-                case 'gif':
-                    $num = $this->query->count_num('gif')->num;
-                    $num = ($num >= 160) ? 160 : $num;
-                    $config['base_url'] = "/found/gif/";
-                    break;
-                case 'views':  
-                    $num = $this->query->count_num('visitor')->num;
-                    $num = ($num >= 160) ? 160 : $num;
-                    $config['base_url'] = "/found/views/";
-                    break;
-                case 'large':
-                    $num = $this->query->count_num('large')->num;
-                    $num = ($num >= 160) ? 160 : $num;
-                    $config['base_url'] = "/found/large/";
-                    break;
-                default:
-                    $num = $this->query->count_num('visitor')->num;
-                    $num = ($num >= 160) ? 160 : $num;
-                    $config['base_url'] = "/found/all/";
-                    break;
-            }
+            $num = $this->query->found_count($type);
+            $config['base_url'] = '/found/'.$type.'/';
             //查询图片信息,返回对象
             //$data['imgs'] = $this->query->found(96);
             //$data['imgs'] = $this->db->query($sql)->result_array();

@@ -10,5 +10,16 @@
         }
     ],
     "minimum-stability": "stable",
-    "require": {}
+    "require": {
+        "php": "^8.2",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-gd": "*",
+        "ext-fileinfo": "*",
+        "ext-curl": "*",
+        "ext-mbstring": "*",
+        "ext-ctype": "*",
+        "ext-filter": "*",
+        "ext-session": "*"
+    }
 }

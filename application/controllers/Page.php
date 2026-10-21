@@ -7,7 +7,7 @@
     class Page extends CI_Controller{
         public function _remap($name){
             //获取URI
-            $name = strip_tags($name);
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $name)) { show_404(); }
             
             //查找文件
             $pagefile = FCPATH.'data/pages/'.$name.'.md';
@@ -39,7 +39,7 @@
             $this->load->model('query','',TRUE);
             $data = $this->query->site_setting('1');
             $data->content = $content;
-            $data->title = $arr[1];
+            $data->title = $arr[1] ?? $name;
             $data->description  = $description;
             //载入页面视图
             $this->load->view('/user/header',$data);

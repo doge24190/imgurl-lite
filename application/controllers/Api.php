@@ -11,9 +11,9 @@
             //加载模型
             $this->load->model('query','',TRUE);
             //查询图片
-            $datas = $this->query->found_img($type,1);
+            $datas = $this->query->found_img($type,0);
             
-            $json = json_encode($datas);
+            $json = json_encode($datas, JSON_INVALID_UTF8_SUBSTITUTE);
             echo $json;
         }
     }

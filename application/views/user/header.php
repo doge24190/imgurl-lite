@@ -1,4 +1,5 @@
 <?php
+    $version = '';
     //获取版本号
     $ver_file = FCPATH.'data/version.txt';
     if(is_file($ver_file)){
@@ -9,21 +10,24 @@
 <html lang="zh-cn" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 	<meta charset="utf-8" />
-	<title><?php echo @$title; ?></title>
+	<title><?php echo h($title ?? ''); ?></title>
 	<meta name="generator" content="EverEdit" />
 	<meta name="author" content="" />
-	<meta name="keywords" content="<?php echo @$keywords; ?>" />
-	<meta name="description" content="<?php echo @$description; ?>" />
+	<meta name="keywords" content="<?php echo h($keywords ?? ''); ?>" />
+	<meta name="description" content="<?php echo h($description ?? ''); ?>" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="/favicon.ico"  type="image/x-icon" />
 	<link rel="Bookmark" href="/favicon.ico" />
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <link rel="stylesheet" href="/static/font-awesome/css/font-awesome.min.css">
-    <link rel="stylesheet" href="/static/style.css?v=<?php echo $version; ?>">
+    <link rel="stylesheet" href="/static/style.css?v=<?php echo h($version ?? ''); ?>">
     <script src="/static/jquery.min.js"></script>
     <!-- 统计代码 -->
     <?php echo @$analytics; ?>
     <!-- 统计代码END -->
+<meta name="csrf-name" content="<?php echo h($this->security->get_csrf_token_name()); ?>">
+    <meta name="csrf-token" content="<?php echo h($this->security->get_csrf_hash()); ?>">
+    <script src="/static/js/csrf.js"></script>
 </head>
 <body>
     <div id="left-gg"></div>
@@ -36,7 +40,7 @@
                     <div class="left-menu">
                         <a href="/">
                             <div id="logo">
-                                <img src="<?php echo @$logo; ?>">
+                                <img src="<?php echo h($logo ?? ''); ?>">
                             </div>
                         </a>
                     </div>
@@ -53,7 +57,7 @@
                                 </dl>
                             </li>
                             <!-- 简单判断用户是否登录 -->
-                            <?php if((isset($_COOKIE['user'])) && (isset($_COOKIE['token']))){ ?>
+                            <?php $CI =& get_instance(); $CI->load->library('basic'); if ($CI->basic->is_login(false)) { ?>
                                 <li class="layui-nav-item"><a href="/admin/index"><i class="layui-icon layui-icon-console"></i> 后台管理</a></li>
                             <?php }?>
                             <!-- 简单判断用户是否登录END -->

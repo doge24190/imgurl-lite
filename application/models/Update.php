@@ -39,6 +39,10 @@ class Update extends CI_Model {
         ));
     }
 
+    public function compress($id){
+        return $this->db->where('id', (int)$id)->update('images', ['compression' => 1]);
+    }
+
     // 更新密码
     public function password($values){
         $this->db->where('name', 'userinfo');

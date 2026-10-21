@@ -59,54 +59,54 @@
                     </div>
                     <!-- 时间筛选END -->
                 </div>
-            </div>      
+            </div>
             <!-- 条件筛选END -->
         </div>
     </div>
     <div class="layui-row layui-col-space10 showimgs" id = "showimgs">
-        <?php 
+        <?php
                 foreach ($imgs as $img)
                 {
-                    //一些简单的逻辑处理 
+                    //一些简单的逻辑处理
                     //获取缩略图地址
                     $thumbpath = thumbnail($img);
                     $thumburl = $domain.$thumbpath;
                     //源图像地址
                     $img_url = $domain.$img['path'];
             ?>
-            <div class="layui-col-lg3" id = "img<?php echo $img['id']; ?>">
+            <div class="layui-col-lg3" id = "img<?php echo h($img['id'] ?? ''); ?>">
                 <div class = "operate">
                     <!-- 选择按钮 -->
-                    <div class = "choose"><input type="checkbox" name="chk" value = "<?php echo $img['id']; ?>"></div>
+                    <div class = "choose"><input type="checkbox" name="chk" value = "<?php echo h($img['id'] ?? ''); ?>"></div>
                     <!-- 链接图标 -->
                     <div>
-                        <button class="layui-btn  layui-btn-xs layui-btn-normal" title = "获取图片链接" onclick = "showlink('<?php echo $img_url; ?>','<?php echo $thumburl; ?>')">
+                        <button class="layui-btn  layui-btn-xs layui-btn-normal" title = "获取图片链接" onclick = "showlink(<?php echo js_arg($img_url); ?>,<?php echo js_arg($thumburl); ?>)">
                         <i class="fa fa-link"></i>
-                        </button>  
+                        </button>
                     </div>
                     <!-- 信息图标 -->
                     <div>
-                        <button class="layui-btn  layui-btn-xs layui-btn-normal" title = "查看图片信息" onclick = "imginfo('<?php echo $img['imgid']; ?>','<?php echo $img['client_name']; ?>')">
+                        <button class="layui-btn  layui-btn-xs layui-btn-normal" title = "查看图片信息" onclick = "imginfo(<?php echo js_arg($img['imgid']); ?>,<?php echo js_arg($img['client_name']); ?>)">
                             <i class="fa fa-info-circle"></i>
-                        </button>  
+                        </button>
                     </div>
                     <!-- 直达链接 -->
                     <div>
-                        <a href="/img/<?php echo $img['imgid']; ?>" target = "_blank" class="layui-btn layui-btn-xs layui-btn-normal"><i class="fa fa-globe"></i></a>
+                        <a href="/img/<?php echo h($img['imgid'] ?? ''); ?>" target = "_blank" class="layui-btn layui-btn-xs layui-btn-normal"><i class="fa fa-globe"></i></a>
                     </div>
                     <!-- 删除按钮 -->
                     <div>
-                        <button class="layui-btn  layui-btn-xs layui-btn-danger" title = "删除这张图片" onclick = "del_img('<?php echo $img['id']; ?>','<?php echo $img['imgid'] ?>','<?php echo $img['path']; ?>','<?php echo $thumbpath; ?>')">
+                        <button class="layui-btn  layui-btn-xs layui-btn-danger" title = "删除这张图片" onclick = "del_img(<?php echo js_arg($img['id']); ?>,<?php echo js_arg($img['imgid']); ?>,<?php echo js_arg($img['path']); ?>,<?php echo js_arg($thumbpath); ?>)">
                             <i class="fa fa-trash-o"></i>
-                        </button>  
+                        </button>
                     </div>
                 </div>
                 <div class = "img_thumb">
-                    <img src="<?php echo $thumburl; ?>" alt="<?php echo $img['client_name']; ?>" layer-src= "<?php echo $img_url; ?>" lay-src = "<?php echo $thumburl; ?>">
+                    <img src="<?php echo h($thumburl ?? ''); ?>" alt="<?php echo h($img['client_name'] ?? ''); ?>" layer-src= "<?php echo h($img_url ?? ''); ?>" lay-src = "<?php echo h($thumburl ?? ''); ?>">
                 </div>
             </div>
             <?php
-            } 
+            }
         ?>
 	</div>
 	<!-- 分页按钮 -->
@@ -123,7 +123,7 @@
 			</div>
 	    </div>
         <div class="layui-col-lg3">
-            <!-- <button class="layui-btn layui-btn-xs" id = "checkAll">全选</button>--> <label>选中项：</label><button class="layui-btn layui-btn-xs layui-btn-danger" onclick = "del_more()">删除</button> 
+            <!-- <button class="layui-btn layui-btn-xs" id = "checkAll">全选</button>--> <label>选中项：</label><button class="layui-btn layui-btn-xs layui-btn-danger" onclick = "del_more()">删除</button>
         </div>
 	</div>
 	<!-- 分页按钮 -->

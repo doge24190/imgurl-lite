@@ -33,25 +33,28 @@
         }
         //重置密码
         public function resetpass(){
-            $password1 = $this->input->post('password1', TRUE);
-            $password2 = $this->input->post('password2', TRUE);
+            require_post();
+            $password1 = $this->input->post('password1');
+            $password2 = $this->input->post('password2');
+            if (!is_string($password1) || !is_string($password2) || strlen($password2) < 8 || strlen($password2) > 72) {
+                $this->err_msg('密码长度需要为 8 至 72 字节。');
+            }
             //验证文件路径
             $pass_txt = FCPATH."data/password.txt";
             if(!file_exists($pass_txt)){
                 $this->err_msg("没有权限，请参考帮助文档操作！");
             }
             else{
-                $pattern = '/^[a-zA-Z0-9!@#$%^&*.]+$/';
                 if($password1 != $password2){
                     $this->err_msg("两次密码不一致！");
                 }
-                else if(!preg_match($pattern,$password2)){
+                else if(str_contains($password2, "\0")){
                     $this->err_msg("密码格式有误！");
                     exit;
                 }
                 else{
                     //进行密码重置
-                    $password = md5($password2.'imgurl');
+                    $password = password_hash($password2, PASSWORD_DEFAULT);
                     
                     //加载数据库模型
                     $this->load->model('query','',TRUE);

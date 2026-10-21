@@ -1,0 +1,21 @@
+name: PHP 8.2 regression
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, gd, fileinfo, curl, mbstring
+          coverage: none
+      - run: python3 tests/security_smoke.py --php php
+      - run: node tests/csrf.test.js

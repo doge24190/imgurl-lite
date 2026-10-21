@@ -15,7 +15,7 @@
                 <th>要求</th>
                 <th>当前信息</th>
                 <th>检测结果</th>
-                </tr> 
+                </tr>
             </thead>
             <tbody>
                 <?php foreach($env as $value) { ?>
@@ -41,7 +41,7 @@
             <div>
                 <!-- 对检测结果进行判断 -->
                 <?php
-                    if($sum === NULL){
+                    if($sum === TRUE){
                         echo '<a href="/install/?setup=2" class="layui-btn" id = "next">下一步</a>';
                     }
                     elseif($sum === FALSE){

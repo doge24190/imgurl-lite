@@ -1,58 +1,80 @@
 <?php
-    error_reporting(E_ALL^E_NOTICE^E_WARNING^E_DEPRECATED);
-    //获取真实IP
-    function get_ip() { 
-        if (getenv('HTTP_CLIENT_IP')) { 
-        $ip = getenv('HTTP_CLIENT_IP'); 
-        } 
-        elseif (getenv('HTTP_X_FORWARDED_FOR')) { 
-        $ip = getenv('HTTP_X_FORWARDED_FOR'); 
-        } 
-        elseif (getenv('HTTP_X_FORWARDED')) { 
-        $ip = getenv('HTTP_X_FORWARDED'); 
-        } 
-        elseif (getenv('HTTP_FORWARDED_FOR')) { 
-        $ip = getenv('HTTP_FORWARDED_FOR'); 
-
-        } 
-        elseif (getenv('HTTP_FORWARDED')) { 
-        $ip = getenv('HTTP_FORWARDED'); 
-        } 
-        else { 
-        $ip = $_SERVER['REMOTE_ADDR']; 
-        } 
-        return $ip; 
-    } 
-    //获取UA
-    function get_ua(){
-        $ua = $_SERVER['HTTP_USER_AGENT'];
-        return $ua;
+// Shared request validation and context-specific output encoding.
+function h($value): string {
+    return htmlspecialchars(is_scalar($value) ? (string)$value : '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+function js_arg($value): string {
+    return h(json_encode($value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE));
+}
+function csrf_field(): string {
+    $CI =& get_instance();
+    return '<input type="hidden" name="'.h($CI->security->get_csrf_token_name()).'" value="'.h($CI->security->get_csrf_hash()).'">';
+}
+function require_post(): void {
+    $CI =& get_instance();
+    if ($CI->input->method() !== 'post') {
+        header('Allow: POST');
+        show_error('此操作只接受 POST 请求。', 405);
     }
-    //创建token
-    function token($user,$pass){
-        //token生成算法为：用户名 + md5后的密码 + ip + ua
-        $token = $user.$pass.get_ua();
-        $token = md5($token);
-        
-        return $token;
+}
+function get_ip(): string {
+    $CI =& get_instance();
+    return $CI->input->ip_address();
+}
+function get_ua(): string {
+    return is_string($_SERVER['HTTP_USER_AGENT'] ?? null) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 512) : '';
+}
+function is_login($user = null, $pass = null): bool {
+    $CI =& get_instance();
+    $CI->load->library('basic');
+    return $CI->basic->is_login(true);
+}
+function upload_max_bytes(): int {
+    $CI =& get_instance();
+    $CI->load->model('query');
+    $limit = json_decode($CI->query->get_limit());
+    $megabytes = isset($limit->max_size) && (int)$limit->max_size > 0 ? (int)$limit->max_size : 10;
+    return min($megabytes, 1024) * 1024 * 1024;
+}
+function image_details(string $path) {
+    $info = @getimagesize($path);
+    if (!is_array($info) || $info[0] <= 0 || $info[1] <= 0 || $info[0] > 20000000 / $info[1]) {
+        return false;
     }
-    //判断用户是否登录
-    function is_login($user,$pass){
-        $token = $user.$pass.get_ua();
-        $token = md5($token);
-
-        $username = $_COOKIE['user'];
-        $password = $_COOKIE['token'];
-
-        //进行判断
-        if(($user != $username) || ($password != $token)){
-            echo '权限不足！';
-            exit;
-        }
-        else{
-            return true;
-        }
+    if (!in_array($info[2], [IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_BMP, IMAGETYPE_WEBP], true)) {
+        return false;
     }
+    return $info;
+}
+function valid_raster_image(string $path): bool {
+    if (!image_details($path)) { return false; }
+    try {
+        $image = @imagecreatefromstring(file_get_contents($path));
+        $valid = $image !== false;
+        unset($image);
+        return $valid;
+    } catch (Throwable $error) {
+        return false;
+    }
+}
+function image_operation_lock() {
+    $lock = fopen(FCPATH.'data/.upload.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) {
+        throw new RuntimeException('Cannot lock image storage');
+    }
+    return $lock;
+}
+function safe_image_path($path) {
+    if (!is_string($path) || !str_starts_with($path, '/imgs/') || str_contains($path, "\0")) {
+        return false;
+    }
+    $root = realpath(FCPATH.'imgs');
+    $full = realpath(FCPATH.ltrim($path, '/'));
+    if ($root === false || $full === false || !str_starts_with($full, $root.DIRECTORY_SEPARATOR) || !is_file($full)) {
+        return false;
+    }
+    return $full;
+}
     //判断文件MIME类型
     function mime($path){
         $mime = mime_content_type($path);
@@ -64,7 +86,6 @@
             case 'image/bmp':
             case 'image/x-ms-bmp':
             case 'image/webp':
-            case 'image/svg+xml':
                 return TRUE;
                 break;		
             default:
@@ -86,6 +107,7 @@
             case 'image/jpeg':
                 return '.jpg';
                 break;
+            case 'image/bmp':
             case 'image/x-ms-bmp':
                 return '.bmp';
                 break;
@@ -141,24 +163,7 @@
             return $img['path'];
         }
     }
-    //生成4位随机数，方法来自：https://blog.csdn.net/happy_jijiawei/article/details/50581094
-    function GetRandStr($len) 
-    { 
-        $chars = array( 
-            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",  
-            "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",  
-            "w", "x", "y", "z", "A", "B", "C", "D", "E", "F", "G",  
-            "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",  
-            "S", "T", "U", "V", "W", "X", "Y", "Z", "0", "1", "2",  
-            "3", "4", "5", "6", "7", "8", "9" 
-        ); 
-        $charsLen = count($chars) - 1; 
-        shuffle($chars);   
-        $output = ""; 
-        for ($i=0; $i<$len; $i++) 
-        { 
-            $output .= $chars[mt_rand(0, $charsLen)]; 
-        }  
-        return $output;  
-    }
-?>
+
+function GetRandStr($len): string {
+    return substr(bin2hex(random_bytes(max(1, (int)$len))), 0, (int)$len);
+}

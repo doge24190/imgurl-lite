@@ -18,64 +18,20 @@
             如果参数为TURE时，如果没有登录会exit终止执行
         */
         public function is_login($type = FALSE){
-            // 未安装时，不做任何数据库登录检查
-            if (!is_file(FCPATH.'data/install.lock') || !is_file(FCPATH.'data/imgurl.db3')) {
-                if ($type === FALSE) {
-                    return FALSE;
-                } else {
-                    header("location:/install/?setup=1");
-                    exit;
+            if (is_file(FCPATH.'data/install.lock') && is_file(FCPATH.'data/imgurl.db3') && !empty($_COOKIE['imgurl_session'])) {
+                $this->CI->load->model('query', '', true);
+                $this->CI->load->library('auth');
+                $row = $this->CI->query->userinfo();
+                $info = $row ? json_decode($row->values) : null;
+                if ($info && isset($info->username, $info->password)
+                    && $this->CI->auth->check($info->username, $info->password)) {
+                    return true;
                 }
             }
-            //获取COOKIE信息
-            @$user = $_COOKIE['user'];
-            @$token = $_COOKIE['token'];
-
-            //加载模型
-            $this->CI->load->model('query','',TRUE);
-            //加载辅助函数
-            $this->CI->load->helper('basic');
-
-            //如果查询成功
-            if($this->CI->query->userinfo()){
-                $userinfo = $this->CI->query->userinfo();
-                $userinfo = json_decode($userinfo->values);
-
-                $username = $userinfo->username;
-                $password = $userinfo->password;
-                //echo get_ip();
-                $password = $username.$password.get_ua();
-                $password = md5($password);
-
-
-                //判断用户名是否正确,用户名密码正确的情况
-                if(($user == $username) && ($token == $password)){
-                    //判断需要的类型
-                    return TRUE;
-                }
-                //用户名和密码不正确的情况下
-                else{
-                    if($type === FALSE){
-                        
-                        return false;
-                    }
-                    else{
-                        echo "权限不足，请<a href = '/user/login'>重新登录</a> 。";
-                        //清除cookies
-                        setcookie("user", '', time()-3600,"/");
-                        setcookie("token", '', time()-3600,"/");
-                        exit;
-                    }
-                }
+            if ($type === false) {
+                return false;
             }
-            else{
-                if ($type === FALSE) {
-                    return FALSE;
-                } else {
-                    echo '数据库查询错误！';
-                    exit;
-                }
-            }
+            show_error('权限不足，请重新登录。', 401);
         }
         //查询上传数量限制，需要传入访客IP
         public function uplimit($ip){
@@ -83,24 +39,8 @@
         }
         //CURL下载图片
         public function dl_pic($url){
-            $curl = curl_init($url);
-
-            curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36");
-            //伪造reffer
-            curl_setopt ($curl, CURLOPT_REFERER, $url);            
-            curl_setopt($curl, CURLOPT_FAILONERROR, true);
-            curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-            #设置超时时间，最小为1s（可选）
-            curl_setopt($curl , CURLOPT_TIMEOUT, 60);
-
-            $html = curl_exec($curl);
-            
-            curl_close($curl);
-            //返回数据
-            return $html;
+            $this->CI->load->library('remote_image');
+            return $this->CI->remote_image->download($url, upload_max_bytes());
         }
         //网站数据分析
         public function analyze(){

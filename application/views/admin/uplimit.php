@@ -3,22 +3,23 @@
 		<div class="layui-col-lg4">
 			<div id="site">
 			<form class="layui-form" action = "/set/uplimit" method = "post">
+                <?php echo csrf_field(); ?>
 				<div class="layui-form-item">
 					<label class="layui-form-label">游客上传</label>
 					<div class="layui-input-block">
-						<input type="checkbox" lay-filter="upswitch" name="switch" lay-skin="switch" <?php echo $switch;?>>
+						<input type="checkbox" lay-filter="upswitch" name="switch" lay-skin="switch" <?php echo h($switch ?? ''); ?>>
 					</div>
 				</div>
 				<div class="layui-form-item">
 					<label class="layui-form-label">上传数量</label>
 					<div class="layui-input-block">
-					<input type="text" id = "limit" name="limit" required  lay-verify="required" placeholder="指的是游客每日上传数量" autocomplete="off" class="layui-input" value = "<?php echo $limit; ?>">
+					<input type="text" id = "limit" name="limit" required  lay-verify="required" placeholder="指的是游客每日上传数量" autocomplete="off" class="layui-input" value = "<?php echo h($limit ?? ''); ?>">
 					</div>
 				</div>
 				<div class="layui-form-item">
 					<label class="layui-form-label">上传大小</label>
 					<div class="layui-input-block">
-					<input type="text" name="max_size" required  lay-verify="required" placeholder="后端上传大小，单位为Mb" autocomplete="off" class="layui-input" value = "<?php echo $max_size; ?>">
+					<input type="text" name="max_size" required  lay-verify="required" placeholder="后端上传大小，单位为Mb" autocomplete="off" class="layui-input" value = "<?php echo h($max_size ?? ''); ?>">
 					</div>
 				</div>
 				<div class="layui-form-item">

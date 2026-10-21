@@ -36,11 +36,11 @@
             //如果文件夹不存在，则创建文件夹
             if(!is_dir($this->upload_path)){
                 //递归模式创建目录
-                mkdir($this->upload_path,0777,TRUE);
+                mkdir($this->upload_path,0755,TRUE);
             }
             //保证 $this->temp 存在
             if (!is_dir($this->temp)) {
-                mkdir($this->temp, 0777, TRUE);
+                mkdir($this->temp, 0700, TRUE);
             }
             $this->date = date('Y-m-d H:i',time());
             //加载辅助函数
@@ -94,6 +94,7 @@
         }
         public function localhost($type = 'json')
         {
+        require_post();
         $config = $this->config($this->temp);
         $this->load->library('upload', $config);
 
@@ -116,15 +117,19 @@
                     $this->succeed_msg($info);
                     break;
                 case 'url':
+                    header('Content-Type: text/plain; charset=utf-8');
                     echo $url;
                     break;
                 case 'html':
-                    echo "<img src = '$url' />";
+                    header('Content-Type: text/html; charset=utf-8');
+                    echo '<img src="'.h($url).'" />';
                     break;
                 case 'markdown':
+                    header('Content-Type: text/plain; charset=utf-8');
                     echo "![]($url)";
                     break;
                 case 'bbcode':
+                    header('Content-Type: text/plain; charset=utf-8');
                     echo "[img]".$url."[/img]";
                     break;
                 default:
@@ -134,12 +139,14 @@
         }
         //上传成功返回json
         protected function succeed_msg($data){
-            $info = json_encode($data);
+            header('Content-Type: application/json; charset=utf-8');
+            $info = json_encode($data, JSON_INVALID_UTF8_SUBSTITUTE);
             echo $info;
             exit;
         }
         //上传失败返回json
         protected function error_msg($msg){
+            header('Content-Type: application/json; charset=utf-8');
             $data = array(
                 "code"  =>  0,
                 "msg"   =>  $msg
@@ -152,7 +159,10 @@
         //URL上传
         public function url()
     {
-        $url = trim((string)$this->input->post('url', TRUE));
+        require_post();
+        $url = $this->input->post('url');
+        if (!is_string($url) || strlen($url) > 4096) { $this->error_msg('URL 参数不正确。'); }
+        $url = trim($url);
         $this->load->library('basic');
         $this->basic->is_login(TRUE);
 
@@ -160,13 +170,17 @@
             $this->error_msg('不是有效的URL地址！');
         }
 
-        $picData = $this->basic->dl_pic($url);
+        try {
+            $picData = $this->basic->dl_pic($url);
+        } catch (Throwable $error) {
+            $this->error_msg($error->getMessage());
+        }
         if ($picData === false || $picData === '') {
             $this->error_msg('远程图片下载失败！');
         }
 
-        $tmpName = $this->temp . md5($url . microtime(true));
-        if (file_put_contents($tmpName, $picData) === false) {
+        $tmpName = tempnam($this->temp, 'remote-');
+        if ($tmpName === false || file_put_contents($tmpName, $picData) === false) {
             $this->error_msg('临时文件写入失败！');
         }
 
@@ -185,47 +199,33 @@
         //粘贴上传
         public function parse()
     {
-        $date = date('Y-m-d H:i:s', time());
-        $tmpName = md5(get_ip() . get_ua() . $date);
-        $tmpFile = $this->temp . $tmpName;
-
-        $content = isset($_POST['content']) ? $_POST['content'] : '';
-
-        if ($content === '') {
-            $this->error_msg('粘贴内容为空！');
+        require_post();
+        $content = $this->input->post('content');
+        $maxBytes = upload_max_bytes();
+        if (!is_string($content) || $content === '' || strlen($content) > 4 * (int)ceil($maxBytes / 3) + 128) {
+            $this->error_msg('粘贴内容为空、格式错误或超过大小限制。');
         }
-
-        if (strpos($content, 'base64,') !== false) {
-            $content = substr($content, strpos($content, 'base64,') + 7);
+        if (str_starts_with($content, 'data:')) {
+            if (!preg_match('#^data:image/(?:png|jpeg|gif|webp|bmp);base64,#i', $content, $match)) {
+                $this->error_msg('不支持的粘贴图片类型。');
+            }
+            $content = substr($content, strlen($match[0]));
         }
-
         $picfile = base64_decode($content, true);
-
-        if ($picfile === false) {
-            $this->error_msg('粘贴内容解析失败！');
+        if ($picfile === false || strlen($picfile) > $maxBytes) {
+            $this->error_msg('粘贴内容解析失败或超过大小限制。');
         }
-
-        file_put_contents($tmpFile, $picfile);
-
-        $this->finalizeUpload($tmpFile, $tmpName);
+        $tmpFile = tempnam($this->temp, 'paste-');
+        if ($tmpFile === false || file_put_contents($tmpFile, $picfile) === false) {
+            $this->error_msg('临时文件写入失败。');
+        }
+        $this->finalizeUpload($tmpFile, 'pasted-image');
     }
-        /*
-        1. 该方法生成图片的唯一删除token
-        2. 参数为一个数组，内容为IP/UA/DATE
-        3. ip + ua + date + 4位随机数，进行md5加密得到token
-        */
+        // Keep existing 16-character delete-link format with cryptographic randomness.
         protected function token($arr){
-            $ip = $arr['ip'];
-            $ua = $arr['ua'];
-            $date = $arr['date'];
-            //生成4位随机数
-            $str =  GetRandStr(4);
-            $token = $ip.$ua.$date.$str;
-            $token = md5($token);
-            //token只需要16位
-            $token = substr($token, 8, 16);
-            return $token;
+            return bin2hex(random_bytes(8));
         }
+
         /*
         1. 先拿到一个临时文件，就都走这一条收口
         */
@@ -235,11 +235,21 @@
         $this->error_msg('上传文件不存在！');
     }
 
-    if (!mime($tmpPath)) {
+    if (filesize($tmpPath) > upload_max_bytes() || !valid_raster_image($tmpPath) || !mime($tmpPath)) {
         @unlink($tmpPath);
-        $this->error_msg('不允许的文件类型！');
+        $this->error_msg('图片类型、大小或像素数量不符合限制。');
     }
 
+    try {
+        $lock = image_operation_lock();
+    } catch (Throwable $error) {
+        @unlink($tmpPath);
+        $this->error_msg('暂时无法保存图片，请稍后重试。');
+    }
+    if ($this->user === 'visitor' && !$this->query->uplimit(get_ip())) {
+        @unlink($tmpPath);
+        $this->error_msg('上传达到上限！');
+    }
     $imgid = substr(md5_file($tmpPath), 8, 16);
 
     // 查重：如果已经存在，直接返回已有信息
@@ -260,6 +270,7 @@
 
         @unlink($tmpPath);
         $this->re_data($type, $payload);
+        return;
     }
 
     $ext = ext($tmpPath);
@@ -280,6 +291,7 @@
         @unlink($tmpPath);
     }
 
+    chmod($fullPath, 0644);
     $thumbnailPath = $this->relative_path . $imgid . '_thumb' . $ext;
 
     $this->load->library('image');
@@ -325,6 +337,8 @@
     $id = $this->insert->createImageWithInfo($imageRow, $imgInfoRow);
 
     if ($id === false) {
+        @unlink($fullPath);
+        if ($thumbnailPath !== $relativePath) { @unlink(FCPATH.ltrim($thumbnailPath, '/')); }
         $this->error_msg('数据库写入失败！');
     }
 

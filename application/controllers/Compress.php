@@ -1,107 +1,102 @@
 <?php
-    /*
-        name：图片压缩类
-        anthor：xiaoz.me
-        QQ:337003006
-    */
-    defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') OR exit('No direct script access allowed');
 
-    class Compress extends CI_Controller{
-        //构造函数
-        public function __construct(){
-            parent::__construct();
-            //设置超时时间
-            ini_set('max_execution_time','0');
-        }
-        //压缩单张图片,需要传入图片ID
-        public function img($id){
-            $t1 = microtime(true);
+class Compress extends CI_Controller {
+    public function __construct()
+    {
+        parent::__construct();
+        $this->load->library('basic');
+        $this->basic->is_login(true);
+        require_post();
+    }
 
-            //通过图片ID查询出图片基本信息
-            $this->load->model('query','',TRUE);
-            $img = $this->query->img($id);
-
-            //如果图片没有压缩过,则调用压缩接口
-            if($img->compression == 0){
-                //获取图片完整路径
-                $fullpath = FCPATH.$img->path;
-                $this->tinypng($fullpath);
-                //更新数据库
-                $this->load->model('update','',TRUE);
-                $this->update->compress($id);
-                $t2 = microtime(true);
-                //计算执行时间
-                $used_time = round($t2 - $t1).'s';
-                $info = array(
-                    "code"      =>  200,
-                    "used_time" =>  $used_time,
-                    "msg"   =>  'compressing.'
-                );
-                $info = json_encode($info);
-                echo $info;
+    public function img($id = '')
+    {
+        $this->load->model('query', '', true);
+        $image = ctype_digit((string)$id) ? $this->query->img((int)$id) : null;
+        if (!$image) { show_404(); }
+        $key = $this->api_key();
+        if (!$key) { show_error('图片压缩未配置。', 503); }
+        $path = safe_image_path($image->path);
+        if (!$path || $image->compression || !image_details($path)) { show_error('图片不存在、格式不支持或已经压缩。', 409); }
+        if (filesize($path) > upload_max_bytes()) { show_error('图片超过压缩大小限制。', 413); }
+        $originalHash = hash_file('sha256', $path);
+        $originalMode = fileperms($path) & 0777;
+        $temp = false;
+        $backup = false;
+        $replaced = false;
+        $debug = $this->db->db_debug;
+        try {
+            $content = $this->compressed_content($path, $key);
+            $temp = tempnam(dirname($path), '.compress-');
+            if ($temp === false || strlen($content) > upload_max_bytes() || file_put_contents($temp, $content) === false
+                || !valid_raster_image($temp) || image_details($temp)[2] !== image_details($path)[2]) {
+                throw new RuntimeException('Invalid compressed image');
             }
-            //图片已经压缩过情况
-            else{
-                $info = array(
-                    "code"  =>  0,
-                    "msg"   =>  'error：The image has been compressed！'
-                );
-                $info = json_encode($info);
-                echo $info;
+            $lock = image_operation_lock();
+            $current = $this->query->img((int)$id);
+            if (!$current || $current->compression || safe_image_path($current->path) !== $path
+                || hash_file('sha256', $path) !== $originalHash) { throw new RuntimeException('Image changed during compression'); }
+            $directory = FCPATH.'data/temp';
+            if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) { throw new RuntimeException('Cannot create backup directory'); }
+            $backup = tempnam($directory, 'compress-backup-');
+            if ($backup === false || !copy($path, $backup)) { throw new RuntimeException('Cannot back up image'); }
+            chmod($temp, $originalMode);
+            chmod($backup, $originalMode);
+            $this->db->db_debug = false;
+            if (!$this->db->trans_begin() || !rename($temp, $path)) { throw new RuntimeException('Cannot replace image'); }
+            $replaced = true;
+            $this->load->model('update');
+            if (!$this->update->compress($id) || !$this->db->trans_status() || !$this->db->trans_commit()) { throw new RuntimeException('Cannot save compression status'); }
+            $this->output->set_content_type('application/json')->set_output(json_encode(['code' => 200, 'msg' => '压缩成功。']));
+        } catch (Throwable $error) {
+            $this->db->trans_rollback();
+            $restored = !$replaced || ($backup && rename($backup, $path));
+            if (!$restored) { log_message('error', 'Original image recovery required from '.$backup); }
+            log_message('error', 'Compression failed: '.$error->getMessage());
+            // show_error exits; perform cleanup before calling it as finally cannot run after exit.
+            if ($temp && is_file($temp)) { @unlink($temp); }
+            if ($restored && $backup && is_file($backup)) { @unlink($backup); }
+            show_error($restored ? '压缩失败，原图已保留，请检查配置或稍后重试。' : '压缩失败，原图备份已保留，请联系管理员恢复。', 502);
+        } finally {
+            $this->db->db_debug = $debug;
+            if ($temp && is_file($temp)) { @unlink($temp); }
+            if ($backup && is_file($backup)) { @unlink($backup); }
+        }
+    }
+
+    protected function api_key(): string
+    {
+        return getenv('IMGURL_TINIFY_KEY') ?: '';
+    }
+
+    /** Network boundary is separate from the atomic file/database update for offline testing. */
+    protected function compressed_content(string $path, string $key): string
+    {
+        $curl = curl_init('https://api.tinify.com/shrink');
+        $response = '';
+        curl_setopt_array($curl, [
+            CURLOPT_POST => true, CURLOPT_POSTFIELDS => file_get_contents($path),
+            CURLOPT_USERPWD => 'api:'.$key,
+            (defined('CURLOPT_PROTOCOLS_STR') ? constant('CURLOPT_PROTOCOLS_STR') : CURLOPT_PROTOCOLS) => defined('CURLOPT_PROTOCOLS_STR') ? 'HTTPS' : CURLPROTO_HTTPS,
+            CURLOPT_FOLLOWLOCATION => false, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$response): int {
+                if (strlen($response) + strlen($chunk) > 65536) { return 0; }
+                $response .= $chunk;
+                return strlen($chunk);
             }
-
-            
+        ]);
+        $ok = curl_exec($curl);
+        $status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+        $data = json_decode($response, true);
+        $url = $data['output']['url'] ?? null;
+        if ($ok === false || $status !== 201 || !is_string($url)
+            || parse_url($url, PHP_URL_SCHEME) !== 'https' || parse_url($url, PHP_URL_HOST) !== 'api.tinify.com') {
+            throw new RuntimeException('Compression service failed');
         }
-        //请求tinypng压缩接口,传入图片完整路径
-        protected function tinypng($path){
-
-            //tinypng API地址
-            $api_url = "https://api.tinify.com/shrink";
-            $data = file_get_contents($path);
-            //$post_data = array ("username" => "bob","key" => "12345");
-            //$ch = curl_init();
-            $ch = curl_init();
-            $user = "api";
-            $pass = "F8rNr5lh25WYcOECQvAqvcilBMAkhtIM";
-            curl_setopt($ch, CURLOPT_URL, $api_url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-            //curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-            curl_setopt($ch, CURLOPT_USERPWD, "{$user}:{$pass}");
-            // post数据
-            curl_setopt($ch, CURLOPT_POST, 1);
-            // post的变量
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-            //https
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            $output = curl_exec($ch);
-            curl_close($ch);
-            //打印获得的数据
-            $data = json_decode($output);
-            //获取图片压缩后的URL
-            $url =  $data->output->url;
-            //保存图片
-            $this->save($url,$path);
-        }
-        //传递图片URL，并保存文件
-        protected function save($url,$path){
-            //获取图片数据并保存
-            $curl = curl_init($url);
-
-            curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36");
-            curl_setopt($curl, CURLOPT_FAILONERROR, true);
-            curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-            #设置超时时间，最小为1s（可选）
-            #curl_setopt($curl , CURLOPT_TIMEOUT, 1);
-
-            $filedata = curl_exec($curl);
-            curl_close($curl);
-
-            //将图片数据覆盖源文件
-            file_put_contents($path,$filedata);
-        }
-    } 
-?>
+        $this->load->library('remote_image');
+        return $this->remote_image->download($url, upload_max_bytes());
+    }
+}

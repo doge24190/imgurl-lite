@@ -31,3 +31,12 @@
 *.swo
 *~
 
+
+# Server-side authentication and atomic image operations
+/data/.sessions/
+/data/.upload.lock
+/data/.install.mutex
+/data/.install-*
+/vendor/
+._*
+__pycache__/

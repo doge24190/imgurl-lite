@@ -14,25 +14,27 @@
             $this->load->library('basic');
             //验证用户是否登录
             $this->basic->is_login(TRUE);
+            require_post();
         }
         //更新站点设置
         public function site(){
-            //var_dump($data);
-            //接收表单数据
-            $data['logo'] = $this->input->post('logo',TRUE);
-            $data['title'] = $this->input->post('title',TRUE);
-            $data['keywords'] = $this->input->post('keywords',TRUE);
-            $data['description'] = $this->input->post('description',TRUE);
-            $data['analytics'] = $this->input->post('analytics');
-            //$data['comments']   =   $this->input->post('comments');
-            
-
+            $row = $this->db->where('name', 'site_setting')->get('options')->row();
+            $data = $row ? json_decode($row->values, true) : [];
+            if (!is_array($data)) { $data = []; }
+            foreach (['logo', 'title', 'keywords', 'description', 'analytics'] as $field) {
+                $value = $this->input->post($field);
+                if (!is_string($value) || strlen($value) > ($field === 'analytics' ? 65536 : 4096)) {
+                    show_error('站点设置参数格式错误。', 400);
+                    return;
+                }
+                $data[$field] = $value;
+            }
             $data = json_encode($data);
             
             
             //如果更新成功
             if($this->update->site('site_setting',$data)){
-                $ref = isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : '/setting/site';
+                $ref = '/setting/site';
                 $this->delayed_redirect('更新成功，3 秒后返回上一页！', $ref, 3);
             }
             else{
@@ -42,14 +44,20 @@
         }
         //更新上传限制
         public function uplimit(){
-            $data['max_size'] = (int)$this->input->post('max_size',TRUE);
-            $data['limit'] = (int)$this->input->post('limit',TRUE);
+            $size = $this->input->post('max_size');
+            $limit = $this->input->post('limit');
+            if (!is_string($size) || !ctype_digit($size) || (int)$size < 1 || (int)$size > 1024
+                || !is_string($limit) || !ctype_digit($limit) || (int)$limit > 1000000) {
+                show_error('上传大小应为 1 至 1024 MB，上传数量应为 0 至 1000000。', 400);
+                return;
+            }
+            $data = ['max_size' => (int)$size, 'limit' => (int)$limit];
 
             $data = json_encode($data);
             
             //如果更新成功
             if($this->update->site('uplimit',$data)){
-                $ref = isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : '/setting/uplimit';
+                $ref = '/setting/uplimit';
                 $this->delayed_redirect('更新成功，3 秒后返回上一页！', $ref, 3);
             }
             else{
@@ -88,50 +96,19 @@
         }
         //删除单张图片,需传入图片ID，及文件路径
         public function del_img(){
-            //获取数据
-            @$imgid  = $this->input->post('imgid',TRUE);
-            @$path   = $this->input->post('path',TRUE);
-            @$thumbnail_path = $this->input->post('thumbnail_path',TRUE);
-            //判断文件是否存在
-            if (is_file($path)) {
-                unlink($path);
-            }
-            if (is_file($thumbnail_path) && $thumbnail_path !== $path) {
-                unlink($thumbnail_path);
-            }
-            if ($imgid === '' || strlen($imgid) !== 16) {
-                echo json_encode(array(
-                    "code" => 0,
-                    "msg" => "无效的图片ID"
-                ));
+            $imgid = $this->input->post('imgid');
+            if (!is_string($imgid) || !preg_match('/^[a-f0-9]{16}$/i', $imgid)) {
+                show_error('无效的图片ID。', 400);
                 return;
             }
-            if ($path === '') {
-                echo json_encode(array(
-                    "code" => 0,
-                    "msg" => "图片路径不能为空"
-                ));
-                return;
-            }
-
-            $this->load->model('delete', '', TRUE);
-            $this->delete->del_img($imgid);
-
-            $fullPath = FCPATH . ltrim($path, '/');
-            $thumbFullPath = FCPATH . ltrim($thumbnail_path, '/');
-
-            if (is_file($fullPath)) {
-                unlink($fullPath);
-            }
-
-            if ($thumbnail_path !== '' && $thumbFullPath !== $fullPath && is_file($thumbFullPath)) {
-                unlink($thumbFullPath);
-            }
-
-            echo json_encode(array(
-                "code" => 200,
-                "msg"  => "删除成功！"
-            ));
+            $this->load->model('query');
+            $this->load->model('delete');
+            $image = $this->query->onepic($imgid);
+            if (!$image) { show_404(); }
+            $ok = $this->delete->remove_image($image);
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'code' => $ok ? 200 : 0, 'msg' => $ok ? '删除成功！' : '删除失败。'
+            ]));
         }
         //操作成功返回json
         protected function suc_msg($msg){
