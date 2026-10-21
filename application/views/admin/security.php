@@ -5,6 +5,7 @@
                 图片验证码始终启用。这里只开放安全阈值，签名密钥和来源标识不会显示或写入页面。
             </div>
             <form class="layui-form" action="/set/security" method="post">
+                <?php echo csrf_field(); ?>
                 <div class="layui-form-item">
                     <label class="layui-form-label">验证码长度</label>
                     <div class="layui-input-block">

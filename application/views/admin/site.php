@@ -3,37 +3,38 @@
 		<div class="layui-col-lg12">
 			<div id="site">
 			<form class="layui-form" action = "/set/site" method = "post">
+                <?php echo csrf_field(); ?>
 				<div class="layui-form-item">
 					<label class="layui-form-label">Logo地址</label>
 					<div class="layui-input-block">
-					<input type="text" name="logo" required  lay-verify="required" placeholder="可输入绝对路径或URL地址" autocomplete="off" class="layui-input" value = "<?php echo $logo; ?>">
+					<input type="text" name="logo" required  lay-verify="required" placeholder="可输入绝对路径或URL地址" autocomplete="off" class="layui-input" value = "<?php echo h($logo ?? ''); ?>">
 					</div>
 				</div>
 				<div class="layui-form-item">
 					<label class="layui-form-label">网站标题</label>
 					<div class="layui-input-block">
-					<input type="text" name="title" required  lay-verify="required" placeholder="请输入网站标题标题" autocomplete="off" class="layui-input" value = "<?php echo $title; ?>">
+					<input type="text" name="title" required  lay-verify="required" placeholder="请输入网站标题标题" autocomplete="off" class="layui-input" value = "<?php echo h($title ?? ''); ?>">
 					</div>
 				</div>
 				<div class="layui-form-item">
 					<label class="layui-form-label">网站关键词</label>
 					<div class="layui-input-block">
-					<input type="text" name="keywords"  placeholder="多个关键词用英文状态下的逗号(,)分隔" autocomplete="off" class="layui-input" value = "<?php echo $keywords; ?>">
+					<input type="text" name="keywords"  placeholder="多个关键词用英文状态下的逗号(,)分隔" autocomplete="off" class="layui-input" value = "<?php echo h($keywords ?? ''); ?>">
 					</div>
 				</div>
 				<div class="layui-form-item layui-form-text">
 					<label class="layui-form-label">站点描述</label>
 					<div class="layui-input-block">
 <textarea name="description" placeholder="请输入网站描述" class="layui-textarea">
-<?php echo $description; ?>
+<?php echo h($description ?? ''); ?>
 </textarea>
 					</div>
 				</div>
-				
+
 				<div class="layui-form-item layui-form-text">
 					<label class="layui-form-label">统计代码</label>
 					<div class="layui-input-block">
-						<textarea name="analytics" placeholder="请输入统计代码，目前仅测试过百度统计，其它统计代码可能会出错。" class="layui-textarea"><?php echo $analytics; ?></textarea>
+						<textarea name="analytics" placeholder="请输入统计代码，目前仅测试过百度统计，其它统计代码可能会出错。" class="layui-textarea"><?php echo h($analytics ?? ''); ?></textarea>
 					</div>
 				</div>
 				<!-- <div class="layui-form-item layui-form-text">

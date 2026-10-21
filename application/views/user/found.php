@@ -16,40 +16,40 @@
         </div>
     </div>
     <div class="layui-row layui-col-space5" id = "found">
-        <?php 
+        <?php
                 foreach ($imgs as $img)
                 {
-                    //一些简单的逻辑处理 
+                    //一些简单的逻辑处理
                     //获取缩略图地址
                     $thumbpath = thumbnail($img);
                     $thumburl = $domain.$thumbpath;
                     //源图像地址
                     $img_url = $domain.$img['path'];
             ?>
-            <div class="layui-col-lg3" id = "img<?php echo $img['id']; ?>">
-                <div class = "img_thumb" onmouseover = "show_imgcon(<?php echo $img['id']; ?>)" onmouseout = "hide_imgcon(<?php echo $img['id']; ?>)">
-                    <img src="<?php echo $thumburl; ?>" alt="<?php echo $img['client_name']; ?>" layer-src= "<?php echo $img_url; ?>" lay-src = "<?php echo $thumburl; ?>">
-                    <div class="imgcon" id="imgcon<?php echo $img['id']; ?>">
+            <div class="layui-col-lg3" id = "img<?php echo h($img['id'] ?? ''); ?>">
+                <div class = "img_thumb" onmouseover = "show_imgcon(<?php echo h($img['id'] ?? ''); ?>)" onmouseout = "hide_imgcon(<?php echo h($img['id'] ?? ''); ?>)">
+                    <img src="<?php echo h($thumburl ?? ''); ?>" alt="<?php echo h($img['client_name'] ?? ''); ?>" layer-src= "<?php echo h($img_url ?? ''); ?>" lay-src = "<?php echo h($thumburl ?? ''); ?>">
+                    <div class="imgcon" id="imgcon<?php echo h($img['id'] ?? ''); ?>">
                         <!-- 图片链接 -->
-                        <a href="javascript:;" title="图片链接" class="layui-btn layui-btn-xs layui-btn-normal" onclick = "showlink('<?php echo $img_url; ?>','<?php echo $thumburl; ?>')"><i class="fa fa-link"></i></a>
-                        <a href="/img/<?php echo $img['imgid']; ?>" target = "_blank" class="layui-btn layui-btn-xs layui-btn-normal"><i class="fa fa-globe"></i></a>
+                        <a href="javascript:;" title="图片链接" class="layui-btn layui-btn-xs layui-btn-normal" onclick = "showlink(<?php echo js_arg($img_url); ?>,<?php echo js_arg($thumburl); ?>)"><i class="fa fa-link"></i></a>
+                        <a href="/img/<?php echo h($img['imgid'] ?? ''); ?>" target = "_blank" class="layui-btn layui-btn-xs layui-btn-normal"><i class="fa fa-globe"></i></a>
                         <!-- 用户已登录才显示删除按钮 -->
                         <?php
                             if($is_login){
                         ?>
-                        <button class="layui-btn  layui-btn-xs layui-btn-danger" title = "删除这张图片" onclick = "del_img('<?php echo $img['id']; ?>','<?php echo $img['imgid'] ?>','<?php echo $img['path']; ?>','<?php echo $thumbpath; ?>')">
+                        <button class="layui-btn  layui-btn-xs layui-btn-danger" title = "删除这张图片" onclick = "del_img(<?php echo js_arg($img['id']); ?>,<?php echo js_arg($img['imgid']); ?>,<?php echo js_arg($img['path']); ?>,<?php echo js_arg($thumbpath); ?>)">
                             <i class="fa fa-trash-o"></i>
-                        </button> 
+                        </button>
                         <?php } ?>
                         <!-- 删除按钮end -->
                     </div>
                 </div>
             </div>
             <?php
-            } 
+            }
         ?>
     </div>
-        
+
     <!-- 分页按钮 -->
     <div class="layui-row" style = "margin-top:2em;margin-bottom:5em;">
         <div class="layui-col-lg6" id = "paging">

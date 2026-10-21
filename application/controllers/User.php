@@ -16,6 +16,7 @@
             if($this->basic->is_login(FALSE)){
                 //如果已经登录，则跳转到后台
                 header("location:/admin/");
+                return;
             }
             //加载数据库模型
             $this->load->model('query','',TRUE);
@@ -51,7 +52,7 @@
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
             imagepng($image);
-            imagedestroy($image);
+            unset($image);
             exit;
         }
         //验证用户名、密码是否正确
@@ -64,7 +65,7 @@
 
             //获取用户输入的信息
             $user = $this->input->post('user',TRUE);
-            $pass = $this->input->post('password',TRUE);
+            $pass = $this->input->post('password');
             $captcha = $this->input->post('captcha',TRUE);
             $captcha_token = isset($_COOKIE['imgurl_captcha']) ? $_COOKIE['imgurl_captcha'] : '';
             $ip = $this->input->ip_address();
@@ -86,7 +87,8 @@
                 return;
             }
 
-            $pass = md5((is_string($pass) ? $pass : '').'imgurl');
+            $pass = is_string($pass) ? $pass : '';
+            if (strlen($pass) > 4096) { $pass = ''; }
 
             //加载模型
             $this->load->model("query",'',TRUE);
@@ -100,14 +102,25 @@
             $password = $info->password;
 
             $user_matches = is_string($user) && hash_equals((string)$username, $user);
-            $password_matches = hash_equals((string)$password, (string)$pass);
+            $legacy = preg_match('/^[a-f0-9]{32}$/i', $password) === 1;
+            $prehashed = str_starts_with($password, 'sha384:');
+            $password_matches = $legacy ? hash_equals($password, md5($pass.'imgurl'))
+                : password_verify($prehashed ? base64_encode(hash('sha384', $pass, true)) : $pass, $prehashed ? substr($password, 7) : $password);
 
             if($user_matches && $password_matches){
-                $token = token($username,$password);
-                //生成COOKIE
-                $expires = time() + 7 * 24 * 60 * 60;
-                $this->set_cookie_header('user', $username, $expires, TRUE, 'Lax');
-                $this->set_cookie_header('token', $token, $expires, TRUE, 'Lax');
+                if ($legacy || password_needs_rehash($prehashed ? substr($password, 7) : $password, PASSWORD_DEFAULT)) {
+                    $info->password = strlen($pass) > 72
+                        ? 'sha384:'.password_hash(base64_encode(hash('sha384', $pass, true)), PASSWORD_DEFAULT)
+                        : password_hash($pass, PASSWORD_DEFAULT);
+                    $this->load->model('update');
+                    if (!$this->update->password(json_encode($info))) {
+                        show_error('无法升级密码，请检查数据库写入权限。', 503);
+                        return;
+                    }
+                    $password = $info->password;
+                }
+                $this->load->library('auth');
+                $this->auth->login($username, $password);
                 $this->login_security->clear_failures($ip);
                 //跳转到后台
                 $this->json_response(array(
@@ -133,11 +146,17 @@
             }
         }
         public function logout(){
+            if ($this->input->method() !== 'post') {
+                echo '<!doctype html><meta charset="utf-8"><form method="post">'.csrf_field().'<button>确认退出</button></form>';
+                return;
+            }
             $this->clean_cookies();
             $this->delayed_redirect('您已退出，将在 3 秒后返回首页！', '/', 3);
         }
         //清除COOKIE
         protected function clean_cookies(){
+            $this->load->library('auth');
+            $this->auth->logout();
             $this->expire_cookie('user', TRUE, 'Lax');
             $this->expire_cookie('token', TRUE, 'Lax');
 
@@ -168,6 +187,7 @@
         }
         protected function set_cookie_header($name, $value, $expires, $http_only = TRUE, $same_site = 'Lax'){
             $secure = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+                || (bool)config_item('cookie_secure')
                 || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
             $cookie = rawurlencode($name).'='.rawurlencode($value).'; Path=/; Expires='.
                 gmdate('D, d M Y H:i:s T', (int)$expires).'; Max-Age='.max(0, (int)$expires - time());

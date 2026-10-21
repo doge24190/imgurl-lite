@@ -1,89 +1,40 @@
 <?php
-    /* 图片处理类 */
-    defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') OR exit('No direct script access allowed');
 
-    class Image{
-        protected $CI;
-
-        //构造函数
-        public function __construct(){
-            //附属类，让其可以访问CI的资源
-            $this->CI = & get_instance();
-        }
-        public function thumbnail($source,$width,$height){
-            //获取缩略图名称
-            $source = str_replace("\\","/",$source);
-            $imgarr = explode("/",$source);
-            //获取图片信息
-            $imginfo = getimagesize($source);
-            //图片宽
-            $img_w = $imginfo[0];
-            //图片高
-            $img_h = $imginfo[1];
-            //图片MIME类型
-            $mime = $imginfo['mime'];
-            //获取源文件名
-            $filename = end($imgarr);
-            $imgname = explode(".",$filename);
-            //缩略图名称
-            $thumbnail_name = $imgname[0].'_thumb'.'.'.$imgname[1];
-            
-            //获取文件路径
-            $dirname = dirname($source);    //获取的路径最后没有/
-            //缩略图完整路径
-            $thumbnail_full = $dirname.'/'.$thumbnail_name;
-            // 创建缩略图
-            //原图宽高大于缩略图
-            if(($img_w > $width) || ($img_h > $height)){
-                //如果是WEBP/SVG则不裁剪
-                if(($mime === 'image/webp') OR ($mime === 'image/svg+xml')){
-                    return FALSE;
-                }
-                //检测是否支持ImageMagick
-                elseif($this->check()){
-                    //使用ImageMagick裁剪图像
-                    $image = new Imagick($source);
-                    $image->cropThumbnailImage( $width, $height );
-                    //将缩略图输出到文件
-                    $image->writeImage( $thumbnail_full );
-                    //清理工作
-                    $image->clear();
-                    return TRUE;
-                }
-                //不支持ImageMagick，使用GD2进行裁剪
-                else{
-                    //配置裁剪参数，参考：https://codeigniter.org.cn/user_guide/libraries/image_lib.html
-                    $config['image_library'] = 'gd2';
-                    $config['source_image'] = $source;
-                    $config['create_thumb'] = TRUE;
-                    $config['maintain_ratio'] = TRUE;
-                    $config['width']     = $width;
-                    $config['height']   = $height;
-                    $this->CI->load->library('image_lib', $config);
-                    $this->CI->image_lib->resize();
-                    return TRUE;
-                }  
-            }
-            //图片像素太小了，不创建缩略图
-            else{
-                return FALSE;
-            }  
-        }
-        //检测是否支持ImageMagick
-        protected function check(){
-            $ext = get_loaded_extensions();
-            //如果已经安装ImageMagick
-            if(array_search('imagick',$ext)){
-                return TRUE;
-            }
-            else{
-                return FALSE;
-            }
-        }
-        //压缩图片
-        public function compress($source){
-            
+class Image {
+    /** Resize raster images with GD, including BMP and WebP when supported. */
+    public function thumbnail($source, $width, $height): bool
+    {
+        $info = image_details($source);
+        if (!$info || ($info[0] <= $width && $info[1] <= $height)) { return false; }
+        $decoders = [IMAGETYPE_GIF => 'imagecreatefromgif', IMAGETYPE_JPEG => 'imagecreatefromjpeg',
+            IMAGETYPE_PNG => 'imagecreatefrompng', IMAGETYPE_BMP => 'imagecreatefrombmp', IMAGETYPE_WEBP => 'imagecreatefromwebp'];
+        $encoders = [IMAGETYPE_GIF => 'imagegif', IMAGETYPE_JPEG => 'imagejpeg',
+            IMAGETYPE_PNG => 'imagepng', IMAGETYPE_BMP => 'imagebmp', IMAGETYPE_WEBP => 'imagewebp'];
+        $decode = $decoders[$info[2]];
+        $encode = $encoders[$info[2]];
+        if (!function_exists($decode) || !function_exists($encode)) { return false; }
+        $image = null;
+        $thumb = null;
+        try {
+            $image = @$decode($source);
+            if (!$image) { return false; }
+            $scale = min($width / $info[0], $height / $info[1]);
+            $w = max(1, (int)round($info[0] * $scale));
+            $h = max(1, (int)round($info[1] * $scale));
+            $thumb = imagecreatetruecolor($w, $h);
+            imagealphablending($thumb, false);
+            imagesavealpha($thumb, true);
+            imagefill($thumb, 0, 0, imagecolorallocatealpha($thumb, 0, 0, 0, 127));
+            imagecopyresampled($thumb, $image, 0, 0, 0, 0, $w, $h, $info[0], $info[1]);
+            $path = pathinfo($source);
+            $target = $path['dirname'].'/'.$path['filename'].'_thumb.'.$path['extension'];
+            return $encode($thumb, $target) && is_file($target);
+        } catch (Throwable $error) {
+            log_message('error', 'Thumbnail failed: '.$error->getMessage());
+            return false;
+        } finally {
+            unset($image, $thumb);
         }
     }
-
-?>
+}

@@ -71,10 +71,10 @@ function urlup(){
 		$.ajax({
 			type:'post',
 			url:'/upload/url',
-			data:"url=" + arrurl[j],
+			data: {url: arrurl[j]},
 			async : true, 
 			success : function(data){  
-				var re = JSON.parse(data);
+				var re = (typeof data === 'string' ? JSON.parse(data) : data);
 				remsg += (re.url || re.msg || '') + "\n";
 				$("#urlupmsg").val(remsg);
 			}  
@@ -126,7 +126,7 @@ function copyurl(info){
 function imginfo(imgid,title){
 	layer.open({
 		type: 2, 
-		title:title,
+		title: $('<div>').text(title).html(),
 		area:['520px','360px'],
 		content: '/manage/imginfo/' + imgid //这里content是一个URL，如果你不想让iframe出现滚动条，你还可以content: ['http://sentsin.com', 'no']
 	}); 
@@ -134,8 +134,8 @@ function imginfo(imgid,title){
 //删除单张图片
 function del_img(id,imgid,path,thumbnail_path){
 	layer.confirm('确认删除这张图片？', {icon: 3, title:'温馨提示！'}, function(index){
-        $.post("/set/del_img",{imgid:imgid,path:path,thumbnail_path:thumbnail_path},function(data,status){
-			var re = JSON.parse(data);
+        $.post("/set/del_img",{imgid:imgid},function(data,status){
+			var re = (typeof data === 'string' ? JSON.parse(data) : data);
             if(re.code == 200) {
                 $("#img"+id).remove();
                 console.log("#img"+id);
@@ -158,8 +158,8 @@ function del_more(){
 	ids = chkIds.split(',');
 	layer.confirm('确认删除多张图片？（不可恢复）', {icon: 3, title:'温馨提示！'}, function(index){
         for(var i = 0;i < ids.length - 1;i++){
-			$.get("/del/id/" + ids[i],function(data,status){
-				var re = JSON.parse(data);
+			$.post("/del/id/" + ids[i],function(data,status){
+				var re = (typeof data === 'string' ? JSON.parse(data) : data);
 				if(re.code == 200) {
 					$("#img" + re.id).remove();
 					console.log("#img" + re.id);

@@ -22,32 +22,32 @@
                 <tbody>
                     <tr>
                         <td>分辨率</td>
-                        <td><?php echo $width; ?> x <?php echo $height; ?></td> 
+                        <td><?php echo h($width ?? ''); ?> x <?php echo h($height ?? ''); ?></td>
                     </tr>
-                    
+
                     <tr>
                         <td>MIME类型</td>
-                        <td><?php echo $mime; ?></td>
+                        <td><?php echo h($mime ?? ''); ?></td>
                     </tr>
                     <tr>
                         <td>扩展名</td>
-                        <td><?php echo $ext; ?></td>
+                        <td><?php echo h($ext ?? ''); ?></td>
                     </tr>
                     <tr>
                         <td>上传时间</td>
-                        <td><?php echo $date; ?></td> 
+                        <td><?php echo h($date ?? ''); ?></td>
                     </tr>
                     <tr>
                         <td>上传者IP</td>
-                        <td><?php echo $ip; ?></td> 
+                        <td><?php echo h($ip ?? ''); ?></td>
                     </tr>
                     <tr>
                         <td>浏览次数</td>
-                        <td><?php echo $views; ?></td> 
+                        <td><?php echo h($views ?? ''); ?></td>
                     </tr>
                     <tr>
                         <td>文件大小</td>
-                        <td><?php echo $size; ?></td> 
+                        <td><?php echo h($size ?? ''); ?></td>
                     </tr>
                 </tbody>
                 </table>

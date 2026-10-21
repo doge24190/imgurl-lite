@@ -8,21 +8,8 @@
         }
         //查询域名
         public function domain($storage){
-            $sql = "SELECT domains FROM img_storage WHERE `engine` = '$storage'";
-
-            $query = $this->db->query($sql);
-            
-
-            if($query){
-                $row = $query->row();
-                $domain = $row->domains;
-                //var_dump($domain);
-                return $domain;
-
-            }
-            else{
-                return FALSE;
-            }
+            $row = $this->db->select('domains')->where('engine', $storage)->get('storage')->row();
+            return $row ? $row->domains : false;
         }
         //查询是否重复
         public function repeat($imgid){
@@ -170,10 +157,10 @@
                     $sql = "SELECT count(*) AS num FROM `img_images` WHERE `user` = 'visitor'";
                     break;
                 case 'day':
-                    $sql = "SELECT count(*) AS num FROM `img_images` WHERE date LIKE date('now') || '%'";
+                    $sql = "SELECT count(*) AS num FROM img_images WHERE date LIKE ?";
                     break;
                 case 'month':
-                    $sql = "SELECT count(*) AS num FROM `img_images` WHERE date LIKE strftime('%Y-%m','now') || '%'";
+                    $sql = "SELECT count(*) AS num FROM img_images WHERE date LIKE ?";
                     break;
                 case 'gif':
                     $sql = "SELECT count(*) AS num FROM (SELECT a.id,b.ext FROM img_images a INNER JOIN img_imginfo b ON a.imgid = b.imgid AND a.user = 'visitor' AND b.ext = '.gif')";
@@ -193,21 +180,17 @@
                     )";
                     break;
                 default:
-                    # code...
-                    break;
+                    return (object)['num' => 0];
             }
-            $query = $this->db->query($sql);
+            $query = $this->db->query($sql, $type === 'day' ? [date('Y-m-d').'%'] : ($type === 'month' ? [date('Y-m').'%'] : []));
             $row = $query->row();
             return $row;
         }
         //查询单张图片信息
         public function picinfo($imgid){
-            $sql = "SELECT a.id,a.ip,a.imgid,a.path,a.date,b.mime,b.width,b.height,b.views,b.ext,b.client_name FROM img_images AS a INNER JOIN img_imginfo AS b ON a.imgid = b.imgid AND b.imgid = '$imgid' LIMIT 1";
-
-            $query = $this->db->query($sql);
-
-            $query = $query->row();
-            return $query;
+            return $this->db->select('a.id,a.ip,a.imgid,a.path,a.date,b.mime,b.width,b.height,b.views,b.ext,b.client_name')
+                ->from('images AS a')->join('imginfo AS b', 'a.imgid=b.imgid')
+                ->where('a.imgid', $imgid)->limit(1)->get()->row();
         }
         //根据img_images id查出图片信息
         public function img_id($id){
@@ -219,47 +202,21 @@
         }
         //各种条件的图片查询
         public function found_img($type,$page){
-            //探索发现每页显示16张图片
-            $limit = 16;
-            //通用的SQL语句头部
-            $sql_header = "SELECT a.id,a.imgid,a.path,a.thumb_path,a.date,a.compression,a.level,b.mime,b.width,b.height,b.views,b.ext,b.client_name 
-            FROM img_images AS a 
-            INNER JOIN img_imginfo AS b 
-            ON a.imgid = b.imgid 
-            AND a.user = 'visitor' 
-            AND (a.level = 'everyone' OR a.level = 'unknown') ";
-            //根据条件生成不同的SQL语句
-            switch($type){
-                case 'all':
-                    //查询游客上传图片总数
-                    $num = $this->count_num('visitor')->num;
-                    //$config['base_url'] = "/found/all/";
-                    $sql = $sql_header."ORDER BY a.id DESC LIMIT $limit OFFSET $page";
-                    break;
-                case 'gif':
-                    $num = $this->count_num('gif')->num;
-                    //$config['base_url'] = "/found/gif/";
-                    $sql = $sql_header."AND b.ext = '.gif' ORDER BY a.id DESC LIMIT $limit OFFSET $page";
-                    break;
-                case 'views':
-                    $num = $this->count_num('visitor')->num;
-                    //$config['base_url'] = "/found/views/";
-                    $sql = $sql_header."ORDER BY b.views DESC LIMIT $limit OFFSET $page";
-                    break;
-                case 'large':
-                    $num = $this->count_num('large')->num;
-                    //$config['base_url'] = "/found/large/";
-                    $sql = $sql_header."AND b.width >= 1920 AND b.height >= 1080 ORDER BY a.id DESC LIMIT $limit OFFSET $page";
-                    break;
-                default:
-                    //查询游客上传图片总数
-                    $num = $this->count_num('visitor')->num;
-                    //$config['base_url'] = "/found/all/";
-                    $sql = $sql_header."ORDER BY a.id DESC LIMIT $limit OFFSET $page";
-                    break;
-            }
-            $datas = $this->db->query($sql)->result_array();
-            return $datas;
+            $page = filter_var($page, FILTER_VALIDATE_INT);
+            if ($page === false || $page < 0 || $page >= 160) { return []; }
+            $this->found_filter($type);
+            return $this->db->select('a.id,a.imgid,a.path,a.thumb_path,a.date,a.compression,a.level,b.mime,b.width,b.height,b.views,b.ext,b.client_name')
+                ->order_by($type === 'views' ? 'b.views' : 'a.id', 'DESC')->limit(min(16, 160 - $page), $page)->get()->result_array();
+        }
+        private function found_filter($type){
+            $this->db->from('images AS a')->join('imginfo AS b', 'a.imgid=b.imgid')
+                ->where('a.user', 'visitor')->where_in('a.level', ['everyone', 'unknown']);
+            if ($type === 'gif') { $this->db->where('b.ext', '.gif'); }
+            if ($type === 'large') { $this->db->where('b.width >=', 1920)->where('b.height >=', 1080); }
+        }
+        public function found_count($type){
+            $this->found_filter($type);
+            return min(160, $this->db->count_all_results());
         }
         //v2.2升级v2.3
         public function to23(){
@@ -285,7 +242,7 @@
         }
         //查询站点主域名
         public function get_domain() {
-            $sql = 'SELECT "values" FROM "img_options" WHERE `name` = "site_url"';
+            $sql = "SELECT `values` FROM img_options WHERE name = 'site_url'";
             $data = $this->db->query($sql)->row();
             
             if($data){
@@ -311,7 +268,7 @@
             $query = $this->db->query($sql);
             //只获取一行
             $row = $query->row();
-            return $row->values;
+            return $row ? $row->values : '{"max_size":10,"limit":0}';
         }
     }
 ?>

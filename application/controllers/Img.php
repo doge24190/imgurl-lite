@@ -18,7 +18,7 @@
             //计算imgid长度
             $id_length = strlen($imgid);
             //判断是否是有效的ID
-            if($id_length != 16){
+            if(!preg_match('/^[a-f0-9]{16}$/i', $imgid)){
                 show_404();
             }
             //继续执行
@@ -31,6 +31,7 @@
             $imginfo = $this->query->onepic($imgid);
             //查询的img_imginfo
             $picinfo = $this->query->imginfo($imgid);
+            if (!$imginfo || !$picinfo) { show_404(); }
             $siteinfo->description = $picinfo->client_name.",由网友上传至ImgURL图床。";
             //查询图片域名
             @$domain = $this->query->domain($imginfo->storage);
@@ -59,9 +60,9 @@
                 "views"         =>  $picinfo->views,
                 "tags"          =>  $picinfo->tags,
                 "keywords"      =>  $picinfo->client_name,
-                "analytics"     =>  $siteinfo->analytics,
+                "analytics"     =>  $siteinfo->analytics ?? '',
                 "description"   =>  $siteinfo->description,
-                "comments"      =>  $siteinfo->comments,
+                "comments"      =>  $siteinfo->comments ?? '',
                 "ext"           =>  $picinfo->ext,
                 "size"          =>  $size
             );

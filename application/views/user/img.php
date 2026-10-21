@@ -4,20 +4,20 @@
         <div class="layui-col-lg8">
             <div id = "onepic">
                 <div class="onepic">
-                    <div class="title"><h2><?php echo $title; ?></h2></div>
+                    <div class="title"><h2><?php echo h($title ?? ''); ?></h2></div>
                     <div id = "lightgallery">
-                        <img layer-src="<?php echo $url; ?>" src="<?php echo $url; ?>" alt="<?php echo $title; ?>">
+                        <img layer-src="<?php echo h($url ?? ''); ?>" src="<?php echo h($url ?? ''); ?>" alt="<?php echo h($title ?? ''); ?>">
                     </div>
                 </div>
                 <!-- 图片底部信息 -->
                 <div class="picinfo">
                     <p>
-                        <span><a href="javascript:;" title = "上传时间"><i class="fa fa-calendar-check-o"></i> <?php echo $date; ?></a></span>
-                        <span><a href="javascript:;" title = "浏览次数"><i class="fa fa-eye"></i> <?php echo $views; ?>次</a></span>
-                        <span><a href="<?php echo $url; ?>" download = ""><i class="fa fa-cloud-download"></i> 下载</a></span>
+                        <span><a href="javascript:;" title = "上传时间"><i class="fa fa-calendar-check-o"></i> <?php echo h($date ?? ''); ?></a></span>
+                        <span><a href="javascript:;" title = "浏览次数"><i class="fa fa-eye"></i> <?php echo h($views ?? ''); ?>次</a></span>
+                        <span><a href="<?php echo h($url ?? ''); ?>" download = ""><i class="fa fa-cloud-download"></i> 下载</a></span>
                     </p>
                     <div class = "statement">
-                    <i class="fa fa-warning"></i> <?php echo $img_info; ?>
+                    <i class="fa fa-warning"></i> <?php echo h($img_info ?? ''); ?>
                     </div>
                 </div>
                 <!-- 评论按钮 -->
@@ -35,7 +35,7 @@
                 <!-- 评论按钮END -->
             </div>
             <!-- 图片右侧 -->
-            
+
             <!-- 图片右侧END -->
         </div>
         <div class="layui-col-lg4" id = "pic-right">
@@ -59,22 +59,22 @@
                                 <tbody>
                                     <tr>
                                         <td>URL</td>
-                                        <td><input type="text" class="layui-input" id="url" data-cip-id="url" value = "<?php echo $url; ?>"></td>
+                                        <td><input type="text" class="layui-input" id="url" data-cip-id="url" value = "<?php echo h($url ?? ''); ?>"></td>
                                         <td><a href="javascript:;" class="layui-btn layui-btn-sm" onclick="copyurl('url')">复制</a></td>
                                     </tr>
                                     <tr>
                                         <td>HTML</td>
-                                        <td><input type="text" class="layui-input" id="html" data-cip-id="html" value = "<img src = '<?php echo $url; ?>' />"></td>
+                                        <td><input type="text" class="layui-input" id="html" data-cip-id="html" value = "<img src = '<?php echo h($url ?? ''); ?>' />"></td>
                                         <td><a href="javascript:;" class="layui-btn layui-btn-sm" onclick="copyurl('html')">复制</a></td>
                                     </tr>
                                     <tr>
                                         <td>MarkDown</td>
-                                        <td><input type="text" class="layui-input" id="markdown" data-cip-id="markdown" value = "![](<?php echo $url; ?>)"></td>
+                                        <td><input type="text" class="layui-input" id="markdown" data-cip-id="markdown" value = "![](<?php echo h($url ?? ''); ?>)"></td>
                                         <td><a href="javascript:;" class="layui-btn layui-btn-sm" onclick="copyurl('markdown')">复制</a></td>
                                     </tr>
                                     <tr>
                                         <td>BBcode</td>
-                                        <td><input type="text" class="layui-input" id="bbcode" data-cip-id="bbcode" value = "[img]<?php echo $url; ?>[/img]"></td>
+                                        <td><input type="text" class="layui-input" id="bbcode" data-cip-id="bbcode" value = "[img]<?php echo h($url ?? ''); ?>[/img]"></td>
                                         <td><a href="javascript:;" class="layui-btn layui-btn-sm" onclick="copyurl('bbcode')">复制</a></td>
                                     </tr>
                                 </tbody>
@@ -82,7 +82,7 @@
                         </div>
                     </div>
                     <!-- 第1个选项卡END -->
-                    
+
                     <!-- 第二个选项卡 -->
                     <div class="layui-tab-item">
                     <table class="layui-table">
@@ -94,43 +94,43 @@
                             <tr>
                             <th>属性</th>
                             <th>对应值</th>
-                            </tr> 
+                            </tr>
                         </thead> -->
                         <tbody>
                             <tr>
                                 <td>分辨率</td>
-                                <td><?php echo $width; ?> x <?php echo $height; ?></td> 
+                                <td><?php echo h($width ?? ''); ?> x <?php echo h($height ?? ''); ?></td>
                             </tr>
-                            
+
                             <tr>
                                 <td>MIME类型</td>
-                                <td><?php echo $mime; ?></td>
+                                <td><?php echo h($mime ?? ''); ?></td>
                             </tr>
                             <tr>
                                 <td>扩展名</td>
-                                <td><?php echo $ext; ?></td>
+                                <td><?php echo h($ext ?? ''); ?></td>
                             </tr>
                             <tr>
                                 <td>上传日期</td>
-                                <td><?php echo $date; ?></td> 
+                                <td><?php echo h($date ?? ''); ?></td>
                             </tr>
                             <tr>
                                 <td>浏览次数</td>
-                                <td><?php echo $views; ?></td> 
+                                <td><?php echo h($views ?? ''); ?></td>
                             </tr>
                             <tr>
                                 <td>文件大小</td>
-                                <td><?php echo $size; ?></td> 
+                                <td><?php echo h($size ?? ''); ?></td>
                             </tr>
                         </tbody>
                         </table>
                     </div>
                     <!-- 第二个选项卡END -->
                 </div>
-                
+
             </div>
             <!-- 右侧选项卡END -->
-                
+
             </div>
             <!-- 第二个sidebar -->
             <div class="sideba">

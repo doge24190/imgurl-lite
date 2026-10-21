@@ -4,10 +4,11 @@
         <center style = "margin-bottom:2em;"><h1>ImgURL安装向导（2/3）</h1></center>
             <!-- 表单 -->
             <form class="layui-form" action="/install/?setup=3" method = "post">
+                <?php echo csrf_field(); ?>
             <div class="layui-form-item">
                 <label class="layui-form-label">网站域名</label>
                 <div class="layui-input-block">
-                <input type="text" name="domain" required  lay-verify="required" placeholder="一般保持默认" autocomplete="off" class="layui-input" value = "<?php echo $domain; ?>">
+                <input type="text" name="domain" required  lay-verify="required" placeholder="一般保持默认" autocomplete="off" class="layui-input" value = "<?php echo h($domain ?? ''); ?>">
                 </div>
             </div>
             <div class="layui-form-item">
@@ -28,7 +29,7 @@
                 <input type="password" name="pass2" required  lay-verify="required" placeholder="再次确认密码" autocomplete="off" class="layui-input">
                 </div>
             </div>
-            
+
             <div class="layui-form-item">
                 <div class="layui-input-block">
                 <a href="/install/?setup=1" class="layui-btn">上一步</a>
@@ -38,7 +39,7 @@
             </form>
             <!-- 表单EDN -->
             <!-- 下一步按钮 -->
-            
+
             <!-- 下一步按钮END -->
         </div>
     </div>

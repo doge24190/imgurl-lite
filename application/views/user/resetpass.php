@@ -5,7 +5,7 @@
             <div class="layui-col-lg4 layui-col-md-offset4">
                 <!-- 登录表单 -->
                 <div class="login">
-                    <h2 style = "padding-bottom:0.6em;color:#FFFFFF;">当前用户名为: <code style = "color:#FF5722;"><?php echo $username; ?></code>，请设置新密码。</h2>
+                    <h2 style = "padding-bottom:0.6em;color:#FFFFFF;">当前用户名为: <code style = "color:#FF5722;"><?php echo h($username ?? ''); ?></code>，请设置新密码。</h2>
                     <div class="layui-form-item">
                         <input id = "password1" type="password" required  lay-verify="required" placeholder="设置新密码" autocomplete="off" class="layui-input">
                     </div>
