@@ -10,6 +10,8 @@
 <html>
 <head>
 	<meta charset="utf-8">
+    <?php $CI =& get_instance(); $CI->load->model('query'); $branding_settings = $CI->query->site_setting('object'); ?>
+    <link rel="icon" href="<?php echo h(branding_url($branding_settings->favicon ?? null, '/favicon.ico')); ?>">
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 	<title><?php echo h($admin_title ?? ''); ?> - ImgURL后台管理</title>
   	<link rel="stylesheet" href="/static/layui/css/layui.css">

@@ -167,3 +167,17 @@ function safe_image_path($path) {
 function GetRandStr($len): string {
     return substr(bin2hex(random_bytes(max(1, (int)$len))), 0, (int)$len);
 }
+
+// Branding URLs are either trusted defaults, generated local files, or a legacy Logo URL.
+function branding_url($value, string $fallback): string {
+    if (!is_string($value) || $value === '') { return $fallback; }
+    if (preg_match('~^/imgs/branding/[a-f0-9]{64}\.(png|jpeg|webp|gif)$~D', $value)) {
+        return safe_image_path($value) ? $value : $fallback;
+    }
+    if ($fallback === '/static/images/logo.png'
+        && (preg_match('~^/(?!/)[a-zA-Z0-9_./%-]+$~D', $value)
+            || (filter_var($value, FILTER_VALIDATE_URL) && in_array(parse_url($value, PHP_URL_SCHEME), ['http', 'https'], true)))) {
+        return $value;
+    }
+    return $fallback;
+}

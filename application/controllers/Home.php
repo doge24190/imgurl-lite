@@ -49,6 +49,7 @@
                 $siteinfo->info = '游客上传次数不限，单张图片不能超过' . $siteinfo->max_size . 'MB，上传的图片将公开显示。';
             }
 
+            $siteinfo->is_home = true;
             $this->load->view('user/header.php', $siteinfo);
             $this->load->view('user/home.php', $siteinfo);
             $this->load->view('user/footer.php');

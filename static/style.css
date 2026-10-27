@@ -434,6 +434,7 @@ body{
 #logo img{
     width:180px;
     height:60px;
+    object-fit:contain;
     
 }
 #logo{
@@ -649,4 +650,12 @@ body{
 }
 #links .layui-input{
     height:32px;
+}
+
+body.custom-home-background {
+    min-height: 100vh;
+    background-position: center center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
 }

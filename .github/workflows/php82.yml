@@ -19,3 +19,4 @@ jobs:
           coverage: none
       - run: python3 tests/security_smoke.py --php php
       - run: node tests/csrf.test.js
+      - run: node --check static/js/branding.js

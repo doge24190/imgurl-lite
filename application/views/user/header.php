@@ -16,8 +16,8 @@
 	<meta name="keywords" content="<?php echo h($keywords ?? ''); ?>" />
 	<meta name="description" content="<?php echo h($description ?? ''); ?>" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="/favicon.ico"  type="image/x-icon" />
-	<link rel="Bookmark" href="/favicon.ico" />
+    <link rel="icon" href="<?php echo h(branding_url($favicon ?? null, "/favicon.ico")); ?>" />
+	<link rel="Bookmark" href="<?php echo h(branding_url($favicon ?? null, "/favicon.ico")); ?>" />
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <link rel="stylesheet" href="/static/font-awesome/css/font-awesome.min.css">
     <link rel="stylesheet" href="/static/style.css?v=<?php echo h($version ?? ''); ?>">
@@ -29,7 +29,8 @@
     <meta name="csrf-token" content="<?php echo h($this->security->get_csrf_hash()); ?>">
     <script src="/static/js/csrf.js"></script>
 </head>
-<body>
+<?php $home_background = !empty($is_home) ? branding_url($background ?? null, '') : ''; ?>
+<body<?php if ($home_background !== '') { echo ' class="custom-home-background" style="background-image:url('.h(json_encode($home_background, JSON_UNESCAPED_SLASHES)).')"'; } ?>>
     <div id="left-gg"></div>
     <div id="right-gg"></div>
 	<!-- 顶部导航栏 -->
@@ -40,7 +41,7 @@
                     <div class="left-menu">
                         <a href="/">
                             <div id="logo">
-                                <img src="<?php echo h($logo ?? ''); ?>">
+                                <img src="<?php echo h(branding_url($logo ?? null, "/static/images/logo.png")); ?>" alt="<?php echo h($title ?? '网站 Logo'); ?>">
                             </div>
                         </a>
                     </div>
