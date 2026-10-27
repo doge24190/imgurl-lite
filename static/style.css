@@ -546,9 +546,6 @@ body{
 .htmlcontent{
 	color:#393D49;
 }
-#page-sidebar{
-    background-color:#FFFFFF;
-}
 #multiple{
     margin-left:auto;
     margin-right:auto;
@@ -618,31 +615,6 @@ body{
     padding-left:1em;
     padding-top:1em;
     background-color:rgba(0,0,0,0.5);
-}
-#left-gg{
-    position:fixed;
-    left:10px;
-    top:80px;
-    width:100%;
-    max-width: 120px;
-}
-#left-gg img{
-    width:100%;
-    max-width: 120px;
-}
-#right-gg{
-    position:fixed;
-    top:80px;
-    right:10px; 
-}
-#right-gg img{
-    width:100%;
-    max-width: 120px;
-}
-@media screen and (max-width: 1366px) {
-    #left-gg,#right-gg{
-        display: none;
-    }
 }
 .title h2{
 	overflow: hidden;

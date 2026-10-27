@@ -132,11 +132,7 @@
             <!-- 右侧选项卡END -->
 
             </div>
-            <!-- 第二个sidebar -->
-            <div class="sideba">
-                <!-- <a href="https://e.aiguobit.com/?from=xiaoz"><img src="https://www.xiaoz.me/wp-content/uploads/2017/06/netssocks_300.png" alt=""></a> -->
-            </div>
-            <!-- 第二个sidebar结束 -->
+
         </div>
         <!-- 图片主要区域END -->
     </div>

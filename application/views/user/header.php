@@ -31,8 +31,6 @@
 </head>
 <?php $home_background = !empty($is_home) ? branding_url($background ?? null, '') : ''; ?>
 <body<?php if ($home_background !== '') { echo ' class="custom-home-background" style="background-image:url('.h(json_encode($home_background, JSON_UNESCAPED_SLASHES)).')"'; } ?>>
-    <div id="left-gg"></div>
-    <div id="right-gg"></div>
 	<!-- 顶部导航栏 -->
     <div class = "header">
         <div class = "layui-container">

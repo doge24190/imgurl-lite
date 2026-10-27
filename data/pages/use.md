@@ -1,7 +1,7 @@
 # ImgURL使用协议
 
 ### 介绍
-ImgURL诞生于2017年12月，是一款开源的图片管理系统（简称图床），使用PHP + SQLite3开发，您可以自行部署，也可使用[https://imgurl.org/](https://imgurl.org/) 提供的在线服务，但需遵守以下协议。
+ImgURL诞生于2017年12月，是一款开源的图片管理系统（简称图床），使用PHP + SQLite3开发，您可以自行部署，使用时请遵守以下协议。
 
 ### ImgURL在线服务
 * 不得上传色情、暴力、政治等内容
@@ -27,15 +27,7 @@ ImgURL诞生于2017年12月，是一款开源的图片管理系统（简称图�
 * API支持
 
 ### 获取帮助
-* 安装和使用请参考帮助文档：[https://doc.xiaoz.me/](https://doc.xiaoz.me/#/imgurl2/)
-* 使用中遇到问题或者建议可以在[官方社区](https://ttt.sh/category/6/)反馈
-* 需要提供技术支持请联系QQ：337003006（付费）
 
-### 请我喝一杯咖啡
-![](https://i.bmp.ovh/imgs/2019/03/cb349aa4a1b95997.png)
-
-### 联系方式
-* ImgURL官方社区:[https://ttt.sh/](https://ttt.sh/category/6/)
-* Blog:[https://www.xiaoz.me/](https://www.xiaoz.me/)
-* ImgURL交流群：341195621
-* QQ:337003006
+* 安装、部署及使用说明：[项目文档](https://github.com/doge24190/imgurl-lite#readme)
+* 自动化接入：[API 使用说明](/page/api)
+* 问题及建议：[项目反馈](https://github.com/doge24190/imgurl-lite/issues)
