@@ -1,0 +1,737 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ImgURL Lite Management API",
+    "version": "1.0.0",
+    "description": "Scoped, expiring, revocable Bearer credentials. Create and revoke tokens only in the CSRF-protected admin UI. Per-minute limits: 300/IP and 120/token. Responses are JSON with Cache-Control: no-store. Production clients must use HTTPS."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Check readiness; detailed checks require health:read",
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Health"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/api/v1/images": {
+      "get": {
+        "operationId": "listImages",
+        "summary": "List non-adult images, including admin uploads",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "images:read"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 24
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Case-sensitive substring in filename or image ID; maximum 200 UTF-8 bytes",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "usage",
+            "in": "query",
+            "description": "Include suitability and reason for the selected role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "background",
+                "logo",
+                "favicon"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "page",
+                        "per_page",
+                        "has_more"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Image"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/api/v1/images/{imgid}": {
+      "get": {
+        "operationId": "getImage",
+        "summary": "Get one non-adult image",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "images:read"
+        ],
+        "parameters": [
+          {
+            "name": "imgid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{16}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/api/v1/settings/appearance": {
+      "get": {
+        "operationId": "getAppearance",
+        "summary": "Read current appearance and image requirements",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "appearance:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Appearance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Appearance"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAppearance",
+        "summary": "Atomically select uploaded images or restore defaults",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "appearance:write"
+        ],
+        "description": "Uses the same validation, locking, snapshot and rollback service as the admin form. Omitted fields and unrelated site settings are preserved. URLs and file paths are not accepted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": false,
+                "properties": {
+                  "background": {
+                    "type": "string",
+                    "pattern": "^(?:[a-fA-F0-9]{16}|default)$"
+                  },
+                  "logo": {
+                    "type": "string",
+                    "pattern": "^(?:[a-fA-F0-9]{16}|default)$"
+                  },
+                  "favicon": {
+                    "type": "string",
+                    "pattern": "^(?:[a-fA-F0-9]{16}|default)$"
+                  }
+                }
+              },
+              "example": {
+                "background": "0123456789abcdef",
+                "favicon": "default"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated appearance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Appearance"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "description": "Use an imgurl_ token from System settings → API tokens. Never put the token in URLs or cookies."
+      }
+    },
+    "schemas": {
+      "Image": {
+        "type": "object",
+        "required": [
+          "imgid",
+          "name",
+          "created_at",
+          "available",
+          "url",
+          "thumbnail_url",
+          "width",
+          "height",
+          "mime",
+          "size_bytes"
+        ],
+        "properties": {
+          "imgid": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{16}$"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Original upload timestamp in the server timezone"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Path relative to the site root; null when unavailable"
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Path relative to the site root; null when unavailable"
+          },
+          "width": {
+            "type": "integer",
+            "nullable": true
+          },
+          "height": {
+            "type": "integer",
+            "nullable": true
+          },
+          "mime": {
+            "type": "string",
+            "nullable": true
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "eligible": {
+            "type": "boolean",
+            "description": "Only included when usage is specified; full decode is validated at save time"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Appearance": {
+        "type": "object",
+        "required": [
+          "background",
+          "logo",
+          "favicon",
+          "requirements"
+        ],
+        "properties": {
+          "background": {
+            "type": "string",
+            "nullable": true,
+            "description": "Path relative to the site root; null when unavailable"
+          },
+          "logo": {
+            "type": "string"
+          },
+          "favicon": {
+            "type": "string"
+          },
+          "requirements": {
+            "type": "object",
+            "description": "Supported formats, file and pixel limits, and dimensions for each role",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status",
+          "api_version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "api_version": {
+            "type": "string",
+            "enum": [
+              "v1"
+            ]
+          },
+          "application_version": {
+            "type": "string",
+            "description": "Only with health:read"
+          },
+          "checks": {
+            "type": "object",
+            "description": "Only with health:read",
+            "properties": {
+              "installed": {
+                "type": "boolean"
+              },
+              "database": {
+                "type": "boolean"
+              },
+              "storage": {
+                "type": "boolean"
+              },
+              "image_processing": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "ok",
+          "error"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "Invalid parameter or malformed JSON",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing, expired, revoked or invalid Bearer token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "WWW-Authenticate": {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bearer authentication challenge"
+          }
+        }
+      },
+      "403": {
+        "description": "Insufficient token scope",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Image or endpoint not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "405": {
+        "description": "Method not allowed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Allow": {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Allowed HTTP methods"
+          }
+        }
+      },
+      "413": {
+        "description": "Request body exceeds 16 KB",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "415": {
+        "description": "Expected application/json",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Selected image is unsuitable or unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "429": {
+        "description": "Rate limited",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "description": "Seconds to wait before retrying"
+          }
+        }
+      },
+      "503": {
+        "description": "Service or storage unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

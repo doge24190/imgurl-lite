@@ -455,7 +455,8 @@ $config['csrf_token_name'] = 'csrf_test_name';
 $config['csrf_cookie_name'] = 'csrf_cookie_name';
 $config['csrf_expire'] = 7200;
 $config['csrf_regenerate'] = FALSE;
-$config['csrf_exclude_uris'] = array('upload/(?:localhost(?:/[^/]+)?|parse)', 'api/(?:upload(?:/[^/]+)?|upload/parse|parse)');
+// The v1 controller accepts only explicit Bearer credentials; admin forms remain CSRF-protected.
+$config['csrf_exclude_uris'] = array('api/v1(?:/.*)?', 'upload/(?:localhost(?:/[^/]+)?|parse)', 'api/(?:upload(?:/[^/]+)?|upload/parse|parse)');
 
 /*
 |--------------------------------------------------------------------------

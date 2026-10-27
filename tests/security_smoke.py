@@ -9,6 +9,9 @@ import concurrent.futures
 import zlib
 import hmac
 import http.cookiejar
+import http.server
+import threading
+import sys
 import json
 import os
 from pathlib import Path
@@ -76,15 +79,15 @@ class Audit_compress extends Compress {
     def cookie(name):
         return next((item.value for item in cookies if item.name == name), '')
 
-    def request(path, data=None, csrf=True, headers=None, anon=False):
+    def request(path, data=None, csrf=True, headers=None, anon=False, method=None):
         request_headers = {'User-Agent': 'ImgURL security regression'}
         request_headers.update(headers or {})
         if isinstance(data, dict):
             data = dict(data)
             if csrf and cookie('csrf_cookie_name'):
                 data['csrf_test_name'] = cookie('csrf_cookie_name')
-            data = urllib.parse.urlencode(data).encode()
-        req = urllib.request.Request(origin + path, data=data, headers=request_headers)
+            data = urllib.parse.urlencode(data, doseq=True).encode()
+        req = urllib.request.Request(origin + path, data=data, headers=request_headers, method=method)
         try:
             response = (anonymous if anon else client).open(req, timeout=15)
         except urllib.error.HTTPError as exc:
@@ -120,6 +123,8 @@ class Audit_compress extends Compress {
                 time.sleep(.05)
         check('installer renders', status == 200)
         check('installer offers next step', b'/install/?setup=2' in body)
+        status, body, _ = request('/api/v1/health', anon=True)
+        check('API health before install is degraded JSON without creating database', status == 503 and json.loads(body)['data']['status'] == 'degraded' and not (app / 'data/imgurl.db3').exists())
         status, _, _ = request('/install/?setup=3', {'domain': origin, 'user': 'audit', 'pass1': 'audit-password', 'pass2': 'audit-password'}, csrf=False)
         check('installer rejects missing CSRF', status == 403)
         status, body, _ = request('/install/?setup=3', {'domain': origin, 'user': 'audit', 'pass1': 'audit-password', 'pass2': 'audit-password'})
@@ -271,6 +276,236 @@ class Audit_compress extends Compress {
         check('branding reset restores defaults and cleans copies', status == 200 and site_settings()['background'] == '' and site_settings()['favicon'] == '' and not copies[0].exists() and not copies[2].exists())
         status, body, _ = request('/')
         check('branding default favicon and background restored', b'/favicon.ico' in body and b'custom-home-background' not in body)
+        # Versioned API, backed by scoped opaque tokens and the same branding save service.
+        def api(path, token=None, data=None, method='GET', headers=None, as_admin=False):
+            h = dict(headers or {})
+            if token is not None:
+                h['Authorization'] = 'Bearer ' + token
+            if data is not None:
+                if not isinstance(data, bytes):
+                    data = json.dumps(data).encode()
+                h.setdefault('Content-Type', 'application/json')
+            status, body, response_headers = request('/api/v1/' + path, data, headers=h, anon=not as_admin, csrf=False, method=method)
+            parsed = json.loads(body)
+            check('API JSON envelope: ' + path, isinstance(parsed.get('ok'), bool) and 'application/json' in response_headers.get('Content-Type', '') and response_headers.get('Cache-Control') == 'no-store')
+            if status >= 400:
+                check('API structured error: ' + path, parsed['ok'] is False and isinstance(parsed['error']['code'], str))
+            return status, parsed, response_headers
+
+        def token_records():
+            row = db.execute('SELECT "values" FROM img_options WHERE name=?', ('api_tokens',)).fetchone()
+            return json.loads(row[0]) if row else {}
+
+        def store_tokens(records):
+            db.execute('UPDATE img_options SET "values"=? WHERE name=?', (json.dumps(records), 'api_tokens'))
+            db.commit()
+
+        def create_token(name, scopes):
+            status, body, _ = request('/tokens/create', {'name': name, 'scopes[]': scopes, 'days': '30'})
+            found = re.search(rb'id="api-created-token"[^>]*value="(imgurl_[a-f0-9]{64})"', body)
+            check('admin creates API token: ' + name, status == 200 and found is not None)
+            return found[1].decode()
+
+        status, body, _ = api('health')
+        check('public health exposes only aggregate state', status == 200 and body['data'] == {'status': 'ok', 'api_version': 'v1'})
+        status, _, _ = request('/setting/tokens', anon=True)
+        check('token management requires login', status == 401)
+        status, _, _ = request('/tokens/create', {'name': 'unauthorized', 'scopes[]': ['images:read'], 'days': '30'}, anon=True)
+        check('anonymous token creation rejected', status in [401, 403])
+        status, _, _ = request('/tokens/create', {'name': 'no-csrf', 'scopes[]': ['images:read'], 'days': '30'}, csrf=False)
+        check('token creation requires CSRF', status == 403)
+        for data in [
+            {'name': '', 'scopes[]': ['health:read'], 'days': '30'},
+            {'name': 'bad scope', 'scopes[]': ['admin:all'], 'days': '30'},
+            {'name': 'no scope', 'days': '30'},
+            {'name': 'bad days', 'scopes[]': ['health:read'], 'days': '0'},
+            {'name': 'bad name', 'scopes': 'health:read', 'days': '30'}
+        ]:
+            status, body, _ = request('/tokens/create', data)
+            check('invalid token creation rejected', status == 400 and b'id="api-created-token"' not in body)
+        full = create_token('full access', ['health:read', 'images:read', 'appearance:read', 'appearance:write'])
+        readonly = create_token('read only', ['health:read', 'images:read', 'appearance:read'])
+        writer = create_token('appearance only', ['appearance:write'])
+        for extra, credential, expected in [([], '', 0), (['--images', '--appearance'], readonly, 0), (['--images'], writer, 1)]:
+            probe = subprocess.run([sys.executable, str(repo / 'scripts/api_check.py'), '--base-url', origin, *extra], env={**os.environ, 'IMGURL_API_TOKEN': credential}, capture_output=True, text=True)
+            check('production probe is read-only and reports permissions correctly', probe.returncode == expected and json.loads(probe.stdout)['ok'] == (expected == 0) and (not credential or credential not in probe.stdout + probe.stderr))
+        redirects = []
+        class RedirectFixture(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                redirects.append(self.path)
+                self.send_response(302)
+                self.send_header('Location', '/credential-must-not-reach-this-path')
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+        redirect_server = http.server.HTTPServer(('127.0.0.1', 0), RedirectFixture)
+        redirect_thread = threading.Thread(target=redirect_server.serve_forever, daemon=True)
+        redirect_thread.start()
+        try:
+            probe = subprocess.run([sys.executable, str(repo / 'scripts/api_check.py'), '--base-url', 'http://127.0.0.1:' + str(redirect_server.server_port)], env={**os.environ, 'IMGURL_API_TOKEN': readonly}, capture_output=True, text=True)
+            check('production probe never follows redirects with credentials', probe.returncode == 1 and redirects == ['/api/v1/health'] and readonly not in probe.stdout + probe.stderr)
+        finally:
+            redirect_server.shutdown()
+            redirect_server.server_close()
+            redirect_thread.join()
+        records = token_records()
+        full_id = next(k for k, v in records.items() if v['hash'] == hashlib.sha256(full.encode()).hexdigest())
+        check('tokens stored only as hashes', full not in json.dumps(records) and readonly not in json.dumps(records) and len(records[full_id]['hash']) == 64)
+        status, body, headers = request('/setting/tokens')
+        check('token page does not redisplay secrets', status == 200 and full.encode() not in body and readonly.encode() not in body and headers.get('Cache-Control') == 'no-store')
+        status, _, headers = api('images', as_admin=True)
+        check('browser session never authenticates token API', status == 401 and headers.get('WWW-Authenticate', '').startswith('Bearer'))
+        status, _, _ = api('images?token=' + readonly)
+        check('query string cannot authenticate API', status == 401)
+        status, _, _ = api('images', headers={'Cookie': 'api_token=' + readonly})
+        check('cookie cannot authenticate API', status == 401)
+        status, _, _ = api('images', token='invalid')
+        check('invalid bearer token rejected', status == 401)
+        status, _, _ = api('images', token=writer)
+        check('scopes constrain image access', status == 403)
+        status, _, _ = api('settings/appearance', token=writer)
+        check('write permission does not grant read endpoint access', status == 403)
+        status, body, _ = api('health', token=readonly)
+        check('health scope returns safe diagnostics', status == 200 and all(body['data']['checks'].values()) and 'application_version' in body['data'] and str(app) not in json.dumps(body))
+        status, _, _ = api('health', token=writer)
+        check('health details require their own scope', status == 403)
+        status, _, _ = api('unknown')
+        check('unknown versioned endpoint is JSON 404', status == 404)
+        status, _, headers = api('images', token=full, data={}, method='POST')
+        check('unsupported method is JSON 405 with Allow', status == 405 and headers.get('Allow') == 'GET')
+        status, _, _ = api('tokens', token=full, data={}, method='POST')
+        check('API cannot create or manage tokens', status == 404)
+        for query in ['page=0', 'page[]=1', 'per_page=51', 'per_page=-1', 'search[]=bad', 'usage=unknown']:
+            status, _, _ = api('images?' + query, token=readonly)
+            check('API image query validation: ' + query, status == 400)
+        status, first, _ = api('images?search=brand-page-&per_page=24', token=readonly)
+        status, second, _ = api('images?search=brand-page-&per_page=24&page=2', token=readonly)
+        check('API images support pagination', len(first['data']['items']) == 24 and first['data']['has_more'] and len(second['data']['items']) == 2 and not second['data']['has_more'])
+        status, body, _ = api('images?search=' + urllib.parse.quote("' OR 1=1--"), token=readonly)
+        check('API search is parameterized', status == 200 and body['data']['items'] == [])
+        status, body, _ = api('images?search=' + icon['imgid'] + '&usage=favicon', token=readonly)
+        item = body['data']['items'][0]
+        check('API images expose real dimensions, size, MIME and suitability', status == 200 and item['width'] == item['height'] == 128 and item['size_bytes'] == len(icon_bytes) and item['mime'] == 'image/png' and item['eligible'])
+        check('API images omit IPs and deletion credentials', not ({'ip', 'token', 'delete', 'user', 'credential'} & item.keys()))
+        db.execute('UPDATE img_imginfo SET width=999,height=999 WHERE imgid=?', (icon['imgid'],))
+        db.commit()
+        status, body, _ = api('images/' + icon['imgid'], token=readonly)
+        check('API ignores forged size metadata', status == 200 and body['data']['width'] == 128)
+        status, body, _ = api('images/' + icon['imgid'].upper(), token=readonly)
+        check('API accepts uppercase hexadecimal image IDs', status == 200 and body['data']['imgid'] == icon['imgid'])
+        db.execute('UPDATE img_imginfo SET width=128,height=128 WHERE imgid=?', (icon['imgid'],))
+        db.execute("UPDATE img_images SET level='adult' WHERE imgid=?", (icon['imgid'],))
+        db.commit()
+        status, _, _ = api('images/' + icon['imgid'], token=readonly)
+        check('API excludes restricted images', status == 404)
+        db.execute("UPDATE img_images SET level='everyone' WHERE imgid=?", (icon['imgid'],))
+        db.commit()
+        status, _, _ = api('images/0000000000000000', token=readonly)
+        check('API missing image is JSON 404', status == 404)
+        status, _, _ = api('images/not-an-id', token=readonly)
+        check('API invalid image ID is JSON 400', status == 400)
+        icon_source.rename(root / 'api-image-temp.png')
+        status, body, _ = api('images/' + icon['imgid'], token=readonly)
+        check('API missing source is marked unavailable', status == 200 and not body['data']['available'] and body['data']['url'] is None)
+        (root / 'api-image-temp.png').rename(icon_source)
+        status, body, _ = api('settings/appearance', token=readonly)
+        check('API appearance returns URLs and size requirements without other settings', status == 200 and set(body['data']) == {'background', 'logo', 'favicon', 'requirements'} and body['data']['requirements']['favicon']['output_width'] == 256)
+        before = site_settings()
+        status, _, _ = api('settings/appearance', token=readonly, data={'logo': icon['imgid']}, method='PATCH')
+        check('read only API token cannot write appearance', status == 403 and site_settings() == before)
+        for data in [b'{bad', b'[]', b'{}', b'null', {'title': 'blocked'}, {'logo': {'imgid': icon['imgid']}}, {'logo': '/imgs/test.png'}, {'logo': 'keep'}]:
+            status, _, _ = api('settings/appearance', token=full, data=data, method='PATCH')
+            check('API validates JSON and field allowlist', status == 400 and site_settings() == before)
+        status, _, _ = api('settings/appearance', token=full, data=b'{}', headers={'Content-Type': 'text/plain'}, method='PATCH')
+        check('API enforces JSON media type', status == 415)
+        status, _, _ = api('settings/appearance', token=full, data=b' ' * 16385, method='PATCH')
+        check('API bounds JSON body size', status == 413)
+        status, _, _ = api('settings/appearance', token=full, data={'favicon': background['imgid']}, method='PATCH')
+        check('API reuses image dimension validation', status == 422 and site_settings() == before)
+        status, _, _ = api('settings/appearance', token=full, data={'logo': '0000000000000000'}, method='PATCH')
+        check('API requires registered existing image', status == 422)
+        status, body, _ = api('settings/appearance', token=writer, data={'background': background['imgid'], 'logo': icon['imgid'], 'favicon': icon['imgid']}, method='PATCH')
+        api_branded = site_settings()
+        check('API saves appearance through shared service', status == 200 and all(api_branded[k].startswith('/imgs/branding/') for k in ['background', 'logo', 'favicon']))
+        check('API preserves unrelated site settings', all(api_branded[k] == v for k, v in before.items() if k not in ['background', 'logo', 'favicon']))
+        before_files = set((app / 'imgs/branding').iterdir())
+        status, _, _ = api('settings/appearance', token=full, data={'logo': uploaded['imgid'], 'favicon': background['imgid']}, method='PATCH')
+        check('API invalid later selection rolls back files and settings', status == 422 and site_settings() == api_branded and set((app / 'imgs/branding').iterdir()) == before_files)
+        db.execute("CREATE TRIGGER audit_fail_api BEFORE UPDATE ON img_options WHEN NEW.name='site_setting' BEGIN SELECT RAISE(FAIL, 'fixture failure'); END")
+        db.commit()
+        status, _, _ = api('settings/appearance', token=full, data={'logo': uploaded['imgid']}, method='PATCH')
+        check('API storage failure is JSON and preserves existing state', status == 503 and site_settings() == api_branded and set((app / 'imgs/branding').iterdir()) == before_files)
+        db.execute('DROP TRIGGER audit_fail_api')
+        db.commit()
+        status, _, _ = api('settings/appearance', token=full, data={'background': 'default', 'logo': 'default', 'favicon': 'default'}, method='PATCH')
+        check('API can restore defaults', status == 200 and site_settings()['logo'] == '/static/images/logo.png')
+        records = token_records()
+        saved_expiry = records[full_id]['expires_at']
+        records[full_id]['expires_at'] = int(time.time()) - 1
+        store_tokens(records)
+        status, _, _ = api('images', token=full)
+        check('expired API token rejected', status == 401)
+        records[full_id]['expires_at'] = saved_expiry
+        store_tokens(records)
+        saved_user = userinfo()
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', (json.dumps({**saved_user, 'password': 'fixture-password-change'}), 'userinfo'))
+        db.commit()
+        status, _, _ = api('images', token=full)
+        check('account credential change invalidates API tokens', status == 401)
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', (json.dumps(saved_user), 'userinfo'))
+        db.commit()
+        status, _, _ = request('/tokens/revoke', {'id': full_id}, csrf=False)
+        check('token revocation requires CSRF', status == 403 and full_id in token_records())
+        status, _, _ = request('/tokens/revoke')
+        check('token revocation GET cannot mutate state', status == 405 and full_id in token_records())
+        saved_site = site_settings()
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', ('{invalid', 'site_setting'))
+        db.commit()
+        status, body, _ = api('health')
+        check('public health handles corrupt configuration without leaking diagnostics', status == 503 and 'checks' not in body['data'])
+        status, _, _ = api('settings/appearance', token=full, data={'logo': icon['imgid']}, method='PATCH')
+        check('API refuses to overwrite corrupted site settings', status == 503 and db.execute('SELECT "values" FROM img_options WHERE name=?', ('site_setting',)).fetchone()[0] == '{invalid')
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', (json.dumps(saved_site), 'site_setting'))
+        db.commit()
+        # Fixed-window counters are seeded only in this isolated test fixture.
+        while time.time() % 60 > 57:
+            time.sleep(.05)
+        rate_dir = app / 'data/.api_rate'
+        token_counter = rate_dir / (hashlib.sha256(('token:' + full_id).encode()).hexdigest() + '.json')
+        token_counter.write_text(json.dumps({'window': int(time.time()) // 60, 'count': 119}))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            limited = list(pool.map(lambda _: api('images', token=full), range(2)))
+        check('API token rate limit is atomic across workers', sorted(r[0] for r in limited) == [200, 429] and all(int(r[2]['Retry-After']) > 0 for r in limited if r[0] == 429))
+        token_counter.write_text(json.dumps({'window': int(time.time()) // 60, 'count': 0}))
+        ip_counter = rate_dir / (hashlib.sha256(b'ip:127.0.0.1').hexdigest() + '.json')
+        ip_counter.write_text(json.dumps({'window': int(time.time()) // 60, 'count': 300}))
+        status, _, headers = api('health')
+        check('public health and invalid auth attempts are IP rate limited', status == 429 and int(headers['Retry-After']) > 0)
+        ip_counter.write_text(json.dumps({'window': int(time.time()) // 60, 'count': 0}))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            concurrent_tokens = list(pool.map(lambda n: create_token('concurrent-' + str(n), ['health:read']), range(2)))
+        check('concurrent token creation has no lost updates', all(hashlib.sha256(t.encode()).hexdigest() in {r['hash'] for r in token_records().values()} for t in concurrent_tokens))
+        saved_records = token_records()
+        full_record = saved_records[full_id]
+        store_tokens({format(i, '016x'): {**full_record, 'id': format(i, '016x')} for i in range(50)})
+        status, _, _ = request('/tokens/create', {'name': 'over capacity', 'scopes[]': ['health:read'], 'days': '30'})
+        check('API token count is bounded', status == 400 and len(token_records()) == 50)
+        store_tokens(saved_records)
+        status, _, _ = request('/tokens/revoke', {'id': full_id})
+        check('admin revokes API token', status == 200 and full_id not in token_records())
+        status, _, _ = api('images', token=full)
+        check('revoked API token immediately rejected', status == 401)
+        # Unavailable health storage must still produce a JSON service error.
+        rate_dir.rename(root / 'api-rate-saved')
+        rate_dir.write_text('fixture blocks limiter directory creation')
+        status, _, _ = api('health')
+        check('API limiter storage failure stays JSON without warnings', status == 503)
+        rate_dir.unlink()
+        (root / 'api-rate-saved').rename(rate_dir)
+        specification = json.loads((repo / 'static/openapi.json').read_text())
+        check('OpenAPI documents all v1 operations', specification['openapi'] == '3.0.3' and all(path in specification['paths'] for path in ['/api/v1/health', '/api/v1/images', '/api/v1/images/{imgid}', '/api/v1/settings/appearance']))
+        status, body, _ = request('/page/api')
+        check('API human readable documentation renders', status == 200 and b'/api/v1/health' in body)
         thumb = app / urllib.parse.urlparse(uploaded['thumbnail_url']).path.lstrip('/')
         check('thumbnail generated', thumb.exists() and thumb.stat().st_size > 0)
         for mode in ['url', 'html', 'markdown', 'bbcode', 'json']:

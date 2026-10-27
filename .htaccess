@@ -1,4 +1,6 @@
 RewriteEngine On
+# Forward explicit Bearer credentials to PHP without accepting query-string tokens.
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteCond %{REQUEST_FILENAME} -s [OR]
 RewriteCond %{REQUEST_FILENAME} -l [OR]
 RewriteCond %{REQUEST_FILENAME} -d

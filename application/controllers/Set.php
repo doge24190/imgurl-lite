@@ -29,53 +29,16 @@
                 }
                 $fields[$field] = $value;
             }
-            $previous = $data = [];
-            $error = null;
-            $status = 500;
-            $saved = false;
-            $debug = $this->db->db_debug;
-            $this->db->db_debug = false;
+            $selections = [];
+            foreach (Branding::FIELDS as $field) { $selections[$field] = $this->input->post($field.'_image'); }
             try {
-                $lock = image_operation_lock();
-                $row = $this->query->site_setting();
-                $previous = $row ? json_decode($row->values, true) : [];
-                if (!is_array($previous)) { $previous = []; }
-                $data = array_merge($previous, $fields);
-                // Legacy forms may keep their existing Logo URL; replacements use the library picker.
-                $legacyLogo = $this->input->post('logo');
-                if ($legacyLogo !== null && $legacyLogo !== ($previous['logo'] ?? '')
-                    && $legacyLogo !== '/static/images/logo.png') {
-                    throw new InvalidArgumentException('请从已上传图片中选择 Logo。');
-                }
-                foreach (Branding::FIELDS as $field) {
-                    $selection = $this->input->post($field.'_image');
-                    if ($selection === null || $selection === 'keep') { continue; }
-                    if ($selection === 'default') {
-                        $data[$field] = $field === 'logo' ? '/static/images/logo.png' : '';
-                        continue;
-                    }
-                    if (!is_string($selection) || !preg_match('/^[a-f0-9]{16}$/iD', $selection)) {
-                        throw new InvalidArgumentException('图片选择参数错误。');
-                    }
-                    $data[$field] = $this->branding->publish($this->query->onepic($selection), $field);
-                }
-                if (!$this->update->site('site_setting', json_encode($data, JSON_THROW_ON_ERROR))) {
-                    throw new RuntimeException('无法保存站点设置。');
-                }
-                $saved = true;
-                $this->branding->cleanup($previous, $data);
+                $this->branding->save($fields, $selections, $this->input->post('logo'));
             } catch (InvalidArgumentException $exception) {
-                $error = $exception->getMessage();
-                $status = 400;
+                show_error($exception->getMessage(), 400); return;
             } catch (Throwable $exception) {
                 log_message('error', 'Branding save failed: '.$exception->getMessage());
-                $error = '保存失败，请检查数据库和 imgs 目录的写入权限。';
-            } finally {
-                if (!$saved) { $this->branding->cleanup($data, $previous); }
-                $this->db->db_debug = $debug;
-                if (isset($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+                show_error('保存失败，请检查数据库和 imgs 目录的写入权限。', 500); return;
             }
-            if ($error !== null) { show_error($error, $status); return; }
             $this->delayed_redirect('更新成功，3 秒后返回上一页！', '/setting/site', 3);
         }
         //更新上传限制

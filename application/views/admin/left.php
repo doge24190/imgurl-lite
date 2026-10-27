@@ -16,6 +16,7 @@
             <dd><a href="/setting/site">站点设置</a></dd>
             <dd><a href="/setting/uplimit">上传限制</a></dd>
             <dd><a href="/setting/security">登录安全</a></dd>
+            <dd><a href="/setting/tokens">API 令牌</a></dd>
           </dl>
         </li>
       </ul>

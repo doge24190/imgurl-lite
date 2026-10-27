@@ -58,8 +58,8 @@ function valid_raster_image(string $path): bool {
     }
 }
 function image_operation_lock() {
-    $lock = fopen(FCPATH.'data/.upload.lock', 'c');
-    if ($lock === false || !flock($lock, LOCK_EX)) {
+    $lock = @fopen(FCPATH.'data/.upload.lock', 'c');
+    if ($lock === false || !@flock($lock, LOCK_EX)) {
         throw new RuntimeException('Cannot lock image storage');
     }
     return $lock;

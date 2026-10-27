@@ -49,6 +49,12 @@ ImgURL是一款简单、纯粹的图床程序，使用PHP + SQLite 3开发。
 
 外观副本存放在 `imgs/branding/`，不依赖图片库中的原图；删除原图后仍可正常显示。更换或恢复默认会清理不再使用的外观副本。请将此目录随站点上传文件一同备份，并确保 PHP 对 `imgs/` 目录有写权限。现有站点无需修改数据库结构，旧 Logo 设置保留；图标使用内容指纹地址，更换后自动更新缓存。
 
+### API v1 与访问令牌
+
+后台“系统设置 → API 令牌”可创建有有效期、按权限限制且可撤销的 Bearer Token。API v1 提供健康检查、图片搜索 / 分页 / 详情，以及首页背景、Logo、图标的查询和修改。现有公开上传 API 保持兼容。
+
+详见 [API 使用说明](data/pages/api.md)，安装后也可访问 `/page/api`；机器可读文档为 [OpenAPI 3.0](static/openapi.json)。部署只读验收可运行 `python3 scripts/api_check.py --base-url https://你的域名`。Nginx + PHP-FPM 请确认转发 `Authorization` 请求头，并保留 `data/` 目录访问保护。无需更改现有数据库结构。
+
 ### 鸣谢
 
 ImgURL Lite的诞生离不开以下项目，在此表示感谢。

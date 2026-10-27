@@ -40,3 +40,6 @@
 /vendor/
 ._*
 __pycache__/
+
+# API limiter state (tokens themselves are hashed in the production SQLite database)
+/data/.api_rate/
