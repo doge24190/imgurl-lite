@@ -51,7 +51,7 @@ ImgURL是一款简单、纯粹的图床程序，使用PHP + SQLite 3开发。
 
 ### API v1 与访问令牌
 
-后台“系统设置 → API 令牌”可创建有有效期、按权限限制且可撤销的 Bearer Token。API v1 提供健康检查、图片搜索 / 分页 / 详情，以及首页背景、Logo、图标的查询和修改。现有公开上传 API 保持兼容。
+后台“系统设置 → API 令牌”可创建有有效期、按权限限制且可撤销的 Bearer Token。API v1 提供图片上传、搜索 / 分页 / 详情、删除、健康检查，以及首页背景、Logo、图标的查询和修改。上传和删除分别使用独立权限，已有令牌不会自动获得新权限。现有公开上传 API 保持兼容。
 
 详见 [API 使用说明](data/pages/api.md)，安装后也可访问 `/page/api`；机器可读文档为 [OpenAPI 3.0](static/openapi.json)。部署只读验收可运行 `python3 scripts/api_check.py --base-url https://你的域名`。Nginx + PHP-FPM 请确认转发 `Authorization` 请求头，并保留 `data/` 目录访问保护。无需更改现有数据库结构。
 

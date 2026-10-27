@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "ImgURL Lite Management API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Scoped, expiring, revocable Bearer credentials. Create and revoke tokens only in the CSRF-protected admin UI. Per-minute limits: 300/IP and 120/token. Responses are JSON with Cache-Control: no-store. Production clients must use HTTPS."
   },
   "servers": [
@@ -191,6 +191,128 @@
             "$ref": "#/components/responses/503"
           }
         }
+      },
+      "post": {
+        "operationId": "uploadImage",
+        "summary": "Upload one raster image",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "images:upload"
+        ],
+        "description": "Uploads count as admin uploads and respect site byte/pixel limits and PHP limits. Accepts real PNG, JPEG, GIF, BMP and WebP. Shares validation, locking, deduplication and transactional persistence with legacy uploads. Duplicate files return 200 and duplicate=true, without exposing existing filenames or public deletion keys. Restricted duplicates return 409. Existing tokens are not automatically granted this scope.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Image created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UploadedImage"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative image resource endpoint /api/v1/images/{imgid}"
+              }
+            }
+          },
+          "200": {
+            "description": "Identical image already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UploadedImage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
       }
     },
     "/api/v1/images/{imgid}": {
@@ -236,6 +358,94 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteImage",
+        "summary": "Permanently delete one image and its thumbnail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "images:delete"
+        ],
+        "description": "This separate permission allows deletion of any registered image, including visitor/admin uploads and adult-marked images. Uses only the URL imgid and database paths, with the shared image lock, staged file deletion and database rollback. Preserves independent site branding snapshots. Already absent images return 404. Existing tokens are not automatically granted this scope.",
+        "parameters": [
+          {
+            "name": "imgid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{16}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "imgid",
+                        "deleted"
+                      ],
+                      "properties": {
+                        "imgid": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{16}$"
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -603,6 +813,56 @@
             "additionalProperties": true
           }
         }
+      },
+      "UploadedImage": {
+        "type": "object",
+        "required": [
+          "imgid",
+          "url",
+          "thumbnail_url",
+          "width",
+          "height",
+          "mime",
+          "size_bytes",
+          "duplicate",
+          "delete_endpoint"
+        ],
+        "properties": {
+          "imgid": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{16}$"
+          },
+          "url": {
+            "type": "string",
+            "description": "Image URL using the configured storage domain"
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "description": "Thumbnail URL, or the original URL for a small image"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "delete_endpoint": {
+            "type": "string",
+            "description": "Use DELETE with a token carrying images:delete; this URL is not a deletion credential"
+          }
+        }
       }
     },
     "responses": {
@@ -673,7 +933,7 @@
         }
       },
       "413": {
-        "description": "Request body exceeds 16 KB",
+        "description": "Image or multipart request exceeds site/PHP limits, or appearance JSON body exceeds 16 KB",
         "content": {
           "application/json": {
             "schema": {
@@ -683,7 +943,7 @@
         }
       },
       "415": {
-        "description": "Expected application/json",
+        "description": "Expected multipart/form-data for image upload, or application/json for appearance PATCH",
         "content": {
           "application/json": {
             "schema": {
@@ -693,7 +953,7 @@
         }
       },
       "422": {
-        "description": "Selected image is unsuitable or unavailable",
+        "description": "Invalid image format, content or pixel count, or unsuitable appearance image",
         "content": {
           "application/json": {
             "schema": {
@@ -724,6 +984,16 @@
       },
       "503": {
         "description": "Service or storage unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "Image identifier conflict, or restricted duplicate image",
         "content": {
           "application/json": {
             "schema": {

@@ -63,6 +63,20 @@ class Audit_compress extends Compress {
     }
 }
 """)
+    (app / 'application/controllers/Audit_stale_delete.php').write_text("""<?php
+class Audit_stale_delete extends CI_Controller {
+    public function index() {
+        $this->load->database();
+        $this->load->model('query');
+        $this->load->model('delete');
+        $image = $this->query->onepic($this->input->get('imgid'));
+        $this->db->where('imgid', $image->imgid)->update('images', ['token' => str_repeat('f', 16)]);
+        $removed = $this->delete->remove_image($image);
+        $this->db->where('imgid', $image->imgid)->update('images', ['token' => $image->token]);
+        $this->output->set_content_type('application/json')->set_output(json_encode(['removed' => $removed]));
+    }
+}
+""")
     router = root / 'router.php'
     router.write_text("<?php $_SERVER['CI_ENV']='development'; $_SERVER['SCRIPT_NAME']='/index.php'; chdir(__DIR__.'/app'); require 'index.php';")
     with socket.socket() as sock:
@@ -326,6 +340,200 @@ class Audit_compress extends Compress {
         full = create_token('full access', ['health:read', 'images:read', 'appearance:read', 'appearance:write'])
         readonly = create_token('read only', ['health:read', 'images:read', 'appearance:read'])
         writer = create_token('appearance only', ['appearance:write'])
+        uploader = create_token('upload only', ['images:upload'])
+        deleter = create_token('delete only', ['images:delete'])
+
+        def api_upload(content, token=uploader, name='api-image.png', field='file', extra_file=False, form=None, as_admin=False):
+            boundary = 'imgurl-v1-multipart-test'
+            body = (f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{name}"\r\nContent-Type: application/octet-stream\r\n\r\n').encode() + content + b'\r\n'
+            if extra_file:
+                body += (f'--{boundary}\r\nContent-Disposition: form-data; name="other"; filename="extra.png"\r\n\r\n').encode() + content + b'\r\n'
+            for key, value in (form or {}).items():
+                body += (f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n').encode()
+            body += (f'--{boundary}--\r\n').encode()
+            return api('images', token=token, data=body, method='POST', headers={'Content-Type': 'multipart/form-data; boundary=' + boundary}, as_admin=as_admin)
+
+        incoming = image + b'v1-upload'
+        for credential, expected in [(None, 401), (readonly, 403), (full, 403), (deleter, 403)]:
+            status, _, _ = api_upload(incoming, token=credential)
+            check('upload requires its explicit scope; existing tokens are unchanged', status == expected)
+        status, _, _ = api_upload(incoming, token=None, as_admin=True)
+        check('admin cookie cannot authenticate v1 upload', status == 401)
+        status, _, _ = api('images', token=uploader, data={}, method='POST')
+        check('v1 upload requires multipart media type', status == 415)
+        status, _, _ = api_upload(incoming, field='wrong')
+        check('v1 upload requires file field', status == 400)
+        status, _, _ = api_upload(incoming, field='file[]')
+        check('v1 upload rejects array files', status == 400)
+        status, _, _ = api_upload(incoming, extra_file=True)
+        check('v1 upload rejects multiple files', status == 400)
+        for invalid in [b'not an image', b'<svg xmlns="http://www.w3.org/2000/svg"></svg>', image[:33], b'']:
+            status, _, _ = api_upload(invalid)
+            check('v1 upload checks real decodable raster contents', status == 422)
+        api_large_header = bytearray(image)
+        api_large_header[16:24] = (100000).to_bytes(4, 'big') * 2
+        api_large_header[29:33] = zlib.crc32(api_large_header[12:29]).to_bytes(4, 'big')
+        status, _, _ = api_upload(bytes(api_large_header))
+        check('v1 upload enforces pixel limit', status == 422)
+        status, _, _ = api_upload(image + b'X' * (1024 * 1024 + 1 - len(image)))
+        check('v1 upload enforces exact file size limit', status == 413)
+        status, _, _ = api_upload(image + b'X' * (1100 * 1024))
+        check('v1 upload bounds multipart request size', status == 413)
+        boundary_content = image + b'B' * (1024 * 1024 - len(image))
+        status, body, _ = api_upload(boundary_content)
+        check('v1 upload accepts exact configured size boundary', status == 201 and body['data']['size_bytes'] == 1024 * 1024)
+        api('images/' + body['data']['imgid'], token=deleter, method='DELETE')
+        status, body, headers = api_upload(incoming, name='v1-photo.png', form={'user': 'visitor', 'path': '/tmp/must-not-be-used.png'})
+        v1_uploaded = body['data']
+        v1_id = v1_uploaded['imgid']
+        v1_original = app / urllib.parse.urlparse(v1_uploaded['url']).path.lstrip('/')
+        v1_thumb = app / urllib.parse.urlparse(v1_uploaded['thumbnail_url']).path.lstrip('/')
+        check('v1 upload creates image and thumbnail with 201', status == 201 and not v1_uploaded['duplicate'] and v1_original.read_bytes() == incoming and v1_thumb.is_file() and v1_original != v1_thumb)
+        check('v1 upload returns usable URLs and metadata', v1_uploaded['url'].startswith(origin + '/imgs/') and v1_uploaded['width'] == 640 and v1_uploaded['height'] == 480 and v1_uploaded['mime'] == 'image/png' and v1_uploaded['size_bytes'] == len(incoming) and headers.get('Location') == '/api/v1/images/' + v1_id)
+        check('v1 upload does not disclose public delete keys', not ({'delete', 'token', 'ip', 'name'} & v1_uploaded.keys()) and v1_uploaded['delete_endpoint'] == '/api/v1/images/' + v1_id)
+        check('v1 upload uses admin role, not request fields', db.execute('SELECT user FROM img_images WHERE imgid=?', (v1_id,)).fetchone()[0] == 'admin')
+        status, _, _ = api('images/' + v1_id, token=uploader)
+        check('upload permission does not grant image query permission', status == 403)
+        status, body, _ = api_upload(incoming, name='renamed.png')
+        check('v1 duplicate upload is 200 with same resource', status == 200 and body['data']['duplicate'] and body['data']['imgid'] == v1_id and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (v1_id,)).fetchone()[0] == 1)
+        v1_numeric_id = db.execute('SELECT id FROM img_images WHERE imgid=?', (v1_id,)).fetchone()[0]
+        status, _, _ = request('/audit_compress/img/' + str(v1_numeric_id), {'scenario': 'success'})
+        served_bytes = v1_original.read_bytes()
+        status, body, _ = api_upload(incoming)
+        check('v1 repeat upload remains compatible with previously compressed images', status == 200 and body['data']['duplicate'] and body['data']['size_bytes'] == len(served_bytes))
+        db.execute("UPDATE img_images SET level='adult' WHERE imgid=?", (v1_id,))
+        db.commit()
+        status, _, _ = api_upload(incoming)
+        check('v1 duplicate upload cannot expose restricted image', status == 409)
+        db.execute("UPDATE img_images SET level='unknown' WHERE imgid=?", (v1_id,))
+        db.commit()
+        for extension, encoder in [('jpg', 'imagejpeg'), ('gif', 'imagegif'), ('bmp', 'imagebmp'), ('webp', 'imagewebp')]:
+            raster = subprocess.check_output([args.php, '-r', '$im=imagecreatetruecolor(640,480); ' + encoder + '($im);']) + ('api-' + extension).encode()
+            status, body, _ = api_upload(raster, name='format.' + extension)
+            check('v1 supports raster upload: ' + extension, status == 201 and body['data']['mime'].startswith('image/') and (app / urllib.parse.urlparse(body['data']['thumbnail_url']).path.lstrip('/')).is_file())
+        status, body, _ = api_upload(image + b'v1-path-name', name='../../v1-path.png')
+        check('v1 client filename cannot choose storage path', status == 201 and body['data']['url'].startswith(origin + '/imgs/') and '..' not in body['data']['url'])
+        failed_content = image + b'v1-failed-insert'
+        failed_upload_id = hashlib.md5(failed_content).hexdigest()[8:24]
+        db.execute("CREATE TRIGGER audit_fail_api_upload BEFORE INSERT ON img_imginfo BEGIN SELECT RAISE(FAIL, 'fixture failure'); END")
+        db.commit()
+        status, _, _ = api_upload(failed_content)
+        check('v1 failed upload rolls back rows and published files', status == 503 and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (failed_upload_id,)).fetchone()[0] == 0 and not list((app / 'imgs').rglob(failed_upload_id + '*')))
+        db.execute('DROP TRIGGER audit_fail_api_upload')
+        db.commit()
+        upload_directory = v1_original.parent
+        original_mode = upload_directory.stat().st_mode & 0o777
+        upload_directory.chmod(0o555)
+        try:
+            denied_content = image + b'v1-write-denied'
+            denied_id = hashlib.md5(denied_content).hexdigest()[8:24]
+            status, _, _ = api_upload(denied_content)
+            check('v1 unwritable storage returns JSON and leaves no rows', status == 503 and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (denied_id,)).fetchone()[0] == 0)
+        finally:
+            upload_directory.chmod(original_mode)
+        saved_limits = db.execute('SELECT "values" FROM img_options WHERE name=?', ('uplimit',)).fetchone()[0]
+        _, quota_fixture_body, _ = post_image(image + b'v1-visitor-quota', anon=True)
+        check('visitor quota fixture uploaded', json.loads(quota_fixture_body)['code'] == 200)
+        visitor_total = db.execute("SELECT count(*) FROM img_images WHERE user='visitor'").fetchone()[0]
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', (json.dumps({'max_size': 1, 'limit': max(1, visitor_total)}), 'uplimit'))
+        db.commit()
+        _, exhausted_body, _ = post_image(image + b'v1-exhausted-visitor', anon=True)
+        check('visitor quota is exhausted before token upload', json.loads(exhausted_body)['code'] == 0)
+        status, body, _ = api_upload(image + b'v1-admin-quota')
+        check('v1 upload uses admin authorization independently of visitor quota', status == 201)
+        db.execute('UPDATE img_options SET "values"=? WHERE name=?', (saved_limits, 'uplimit'))
+        db.commit()
+        concurrent_content = image + b'v1-parallel'
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            new_parallel = list(pool.map(lambda _: api_upload(concurrent_content), range(3)))
+        check('v1 concurrent uploads deduplicate atomically', sorted(r[0] for r in new_parallel) == [200, 200, 201] and len({r[1]['data']['imgid'] for r in new_parallel}) == 1)
+        shared_content = image + b'v1-shared-with-legacy'
+        _, legacy_body, _ = post_image(shared_content, anon=True)
+        shared_legacy = json.loads(legacy_body)
+        status, body, _ = api_upload(shared_content)
+        check('v1 and legacy uploads share deduplication without promoting visitors', status == 200 and body['data']['duplicate'] and body['data']['imgid'] == shared_legacy['imgid'] and db.execute('SELECT user FROM img_images WHERE imgid=?', (shared_legacy['imgid'],)).fetchone()[0] == 'visitor')
+        for credential, expected in [(None, 401), (readonly, 403), (uploader, 403), (full, 403)]:
+            status, _, _ = api('images/' + v1_id, token=credential, method='DELETE')
+            check('delete requires its explicit scope; old tokens cannot delete', status == expected and v1_original.is_file())
+        status, _, headers = api('images/' + v1_id, token=deleter, method='POST', data={})
+        check('v1 image detail rejects POST deletion', status == 405 and headers.get('Allow') == 'GET, DELETE')
+        status, _, _ = api('images/not-an-id', token=deleter, method='DELETE')
+        check('v1 deletion validates image ID', status == 400)
+        status, _, _ = api('images/0000000000000000', token=deleter, method='DELETE')
+        check('v1 absent deletion is 404', status == 404)
+        status, stale_body, _ = request('/audit_stale_delete?imgid=' + v1_id)
+        check('public deletion cannot use stale authorization after image token changes', status == 200 and not json.loads(stale_body)['removed'] and v1_original.is_file() and v1_thumb.is_file())
+        db.execute("CREATE TRIGGER audit_fail_api_delete BEFORE DELETE ON img_images BEGIN SELECT RAISE(FAIL, 'fixture failure'); END")
+        db.commit()
+        status, _, _ = api('images/' + v1_id, token=deleter, method='DELETE')
+        check('v1 failed deletion restores image thumbnail and metadata', status == 503 and v1_original.read_bytes() == served_bytes and v1_thumb.is_file() and db.execute('SELECT count(*) FROM img_imginfo WHERE imgid=?', (v1_id,)).fetchone()[0] == 1)
+        db.execute('DROP TRIGGER audit_fail_api_delete')
+        db.commit()
+        delete_sentinel = root / 'api-delete-sentinel.txt'
+        delete_sentinel.write_text('must survive')
+        original_path = urllib.parse.urlparse(v1_uploaded['url']).path
+        db.execute('UPDATE img_images SET path=? WHERE imgid=?', ('/imgs/../../api-delete-sentinel.txt', v1_id))
+        db.commit()
+        status, _, _ = api('images/' + v1_id, token=deleter, method='DELETE')
+        check('v1 deletion rejects database traversal paths', status == 503 and delete_sentinel.read_text() == 'must survive' and v1_original.is_file())
+        db.execute('UPDATE img_images SET path=? WHERE imgid=?', (original_path, v1_id))
+        escape = app / 'imgs/api-delete-escape.png'
+        escape.symlink_to(delete_sentinel)
+        db.execute('UPDATE img_images SET thumb_path=? WHERE imgid=?', ('/imgs/api-delete-escape.png', v1_id))
+        db.commit()
+        status, _, _ = api('images/' + v1_id, token=deleter, method='DELETE')
+        check('v1 deletion rejects symlink escapes and restores staged original', status == 503 and v1_original.is_file() and escape.is_symlink() and delete_sentinel.is_file())
+        escape.unlink()
+        db.execute('UPDATE img_images SET thumb_path=? WHERE imgid=?', (urllib.parse.urlparse(v1_uploaded['thumbnail_url']).path, v1_id))
+        db.commit()
+        status, body, _ = api('images/' + v1_id.upper(), token=deleter, method='DELETE', data={'path': str(delete_sentinel), 'imgid': uploaded['imgid']})
+        check('v1 deletion removes only addressed image and thumbnail', status == 200 and body['data'] == {'imgid': v1_id, 'deleted': True} and not v1_original.exists() and not v1_thumb.exists() and delete_sentinel.is_file() and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (uploaded['imgid'],)).fetchone()[0] == 1)
+        check('v1 deletion removes both metadata rows', db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (v1_id,)).fetchone()[0] == 0 and db.execute('SELECT count(*) FROM img_imginfo WHERE imgid=?', (v1_id,)).fetchone()[0] == 0)
+        status, _, _ = api('images/' + v1_id, token=deleter, method='DELETE')
+        check('v1 repeated deletion is 404', status == 404)
+        tiny_image = subprocess.check_output([args.php, '-r', '$im=imagecreatetruecolor(3,3); imagepng($im);'])
+        _, body, _ = api_upload(tiny_image)
+        tiny_api = body['data']
+        status, _, _ = api('images/' + tiny_api['imgid'], token=deleter, method='DELETE')
+        check('v1 deletion handles identical original and thumbnail paths', status == 200 and tiny_api['url'] == tiny_api['thumbnail_url'])
+        _, body, _ = api_upload(image + b'v1-missing-source')
+        missing_api = body['data']
+        for path in set([missing_api['url'], missing_api['thumbnail_url']]):
+            (app / urllib.parse.urlparse(path).path.lstrip('/')).unlink()
+        status, _, _ = api('images/' + missing_api['imgid'], token=deleter, method='DELETE')
+        check('v1 deletion cleans metadata even when source files are missing', status == 200 and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (missing_api['imgid'],)).fetchone()[0] == 0)
+        _, body, _ = api_upload(image + b'v1-restricted-delete')
+        restricted_id = body['data']['imgid']
+        db.execute("UPDATE img_images SET level='adult' WHERE imgid=?", (restricted_id,))
+        db.commit()
+        status, _, _ = api('images/' + restricted_id, token=deleter, method='DELETE')
+        check('v1 delete scope permits removal of restricted images', status == 200)
+        _, body, _ = api_upload(image + b'v1-concurrent-delete')
+        deleting_id = body['data']['imgid']
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            deletion_results = list(pool.map(lambda _: api('images/' + deleting_id, token=deleter, method='DELETE'), range(2)))
+        check('v1 concurrent deletion is serialized with 200 and 404', sorted(r[0] for r in deletion_results) == [200, 404])
+        _, body, _ = api_upload(image + b'v1-branding-source')
+        branding_api_source = body['data']['imgid']
+        status, _, _ = api('settings/appearance', token=writer, data={'logo': branding_api_source}, method='PATCH')
+        source_snapshot = app / site_settings()['logo'].lstrip('/')
+        status, _, _ = api('images/' + branding_api_source, token=deleter, method='DELETE')
+        check('v1 deletion preserves independent branding snapshot', status == 200 and source_snapshot.is_file())
+        api('settings/appearance', token=writer, data={'logo': 'default'}, method='PATCH')
+        new_scope_records = token_records()
+        upload_token_id = next(k for k, v in new_scope_records.items() if v['hash'] == hashlib.sha256(uploader.encode()).hexdigest())
+        saved_upload_expiry = new_scope_records[upload_token_id]['expires_at']
+        new_scope_records[upload_token_id]['expires_at'] = int(time.time()) - 1
+        store_tokens(new_scope_records)
+        status, _, _ = api_upload(image + b'v1-expired-upload')
+        check('expired upload token cannot create an image', status == 401)
+        new_scope_records[upload_token_id]['expires_at'] = saved_upload_expiry
+        store_tokens(new_scope_records)
+        revocable_delete = create_token('revoked delete', ['images:delete'])
+        revocable_id = next(k for k, v in token_records().items() if v['hash'] == hashlib.sha256(revocable_delete.encode()).hexdigest())
+        request('/tokens/revoke', {'id': revocable_id})
+        status, _, _ = api('images/' + uploaded['imgid'], token=revocable_delete, method='DELETE')
+        check('revoked delete token cannot remove an image', status == 401 and db.execute('SELECT count(*) FROM img_images WHERE imgid=?', (uploaded['imgid'],)).fetchone()[0] == 1)
         for extra, credential, expected in [([], '', 0), (['--images', '--appearance'], readonly, 0), (['--images'], writer, 1)]:
             probe = subprocess.run([sys.executable, str(repo / 'scripts/api_check.py'), '--base-url', origin, *extra], env={**os.environ, 'IMGURL_API_TOKEN': credential}, capture_output=True, text=True)
             check('production probe is read-only and reports permissions correctly', probe.returncode == expected and json.loads(probe.stdout)['ok'] == (expected == 0) and (not credential or credential not in probe.stdout + probe.stderr))
@@ -371,8 +579,8 @@ class Audit_compress extends Compress {
         check('health details require their own scope', status == 403)
         status, _, _ = api('unknown')
         check('unknown versioned endpoint is JSON 404', status == 404)
-        status, _, headers = api('images', token=full, data={}, method='POST')
-        check('unsupported method is JSON 405 with Allow', status == 405 and headers.get('Allow') == 'GET')
+        status, _, headers = api('images', token=full, data={}, method='PUT')
+        check('unsupported method is JSON 405 with Allow', status == 405 and headers.get('Allow') == 'GET, POST')
         status, _, _ = api('tokens', token=full, data={}, method='POST')
         check('API cannot create or manage tokens', status == 404)
         for query in ['page=0', 'page[]=1', 'per_page=51', 'per_page=-1', 'search[]=bad', 'usage=unknown']:
@@ -503,6 +711,7 @@ class Audit_compress extends Compress {
         rate_dir.unlink()
         (root / 'api-rate-saved').rename(rate_dir)
         specification = json.loads((repo / 'static/openapi.json').read_text())
+        check('OpenAPI documents upload and delete operations', specification['paths']['/api/v1/images']['post']['x-required-scopes'] == ['images:upload'] and specification['paths']['/api/v1/images/{imgid}']['delete']['x-required-scopes'] == ['images:delete'])
         check('OpenAPI documents all v1 operations', specification['openapi'] == '3.0.3' and all(path in specification['paths'] for path in ['/api/v1/health', '/api/v1/images', '/api/v1/images/{imgid}', '/api/v1/settings/appearance']))
         status, body, _ = request('/page/api')
         check('API human readable documentation renders', status == 200 and b'/api/v1/health' in body)
@@ -584,6 +793,8 @@ class Audit_compress extends Compress {
         db.commit()
         status, body, _ = request('/audit_compress/img/' + str(uploaded['id']), {'scenario': 'success'})
         check('compression mock success updates bytes and status', status == 200 and json.loads(body)['code'] == 200 and original.read_bytes() != original_bytes and db.execute('SELECT compression FROM img_images WHERE id=?', (uploaded['id'],)).fetchone()[0] == 1)
+        _, compressed_duplicate_body, _ = post_image(image)
+        check('legacy duplicate upload remains compatible after compression', json.loads(compressed_duplicate_body)['code'] == 200 and original.read_bytes() != original_bytes)
         for url in ['http://127.0.0.1/image.png', 'http://169.254.169.254/latest/', 'file:///etc/passwd', 'http://[::1]/image.png', 'http://[::ffff:127.0.0.1]/a', 'http://100.64.0.1/a', 'http://224.0.0.1/a', 'http://198.18.0.1/a', 'http://192.0.0.1/a', 'http://203.0.113.1/a', 'http://example.com:8080/a', 'http://user:pass@example.com/a']:
             status, body, _ = request('/upload/url', {'url': url})
             check('remote unsafe target rejected: ' + url, status == 200 and json.loads(body)['code'] == 0)

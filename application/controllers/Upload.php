@@ -221,143 +221,19 @@
         }
         $this->finalizeUpload($tmpFile, 'pasted-image');
     }
-        // Keep existing 16-character delete-link format with cryptographic randomness.
-        protected function token($arr){
-            return bin2hex(random_bytes(8));
-        }
-
-        /*
-        1. 先拿到一个临时文件，就都走这一条收口
-        */
+        // Shared with the authenticated API; keep legacy response formats and public delete links.
         protected function finalizeUpload(string $tmpPath, string $clientName, string $type = 'json')
-{
-    if (!is_file($tmpPath)) {
-        $this->error_msg('上传文件不存在！');
-    }
-
-    if (filesize($tmpPath) > upload_max_bytes() || !valid_raster_image($tmpPath) || !mime($tmpPath)) {
-        @unlink($tmpPath);
-        $this->error_msg('图片类型、大小或像素数量不符合限制。');
-    }
-
-    try {
-        $lock = image_operation_lock();
-    } catch (Throwable $error) {
-        @unlink($tmpPath);
-        $this->error_msg('暂时无法保存图片，请稍后重试。');
-    }
-    if ($this->user === 'visitor' && !$this->query->uplimit(get_ip())) {
-        @unlink($tmpPath);
-        $this->error_msg('上传达到上限！');
-    }
-    $imgid = substr(md5_file($tmpPath), 8, 16);
-
-    // 查重：如果已经存在，直接返回已有信息
-    if ($imginfo = $this->query->repeat($imgid)) {
-        $ext = pathinfo($imginfo->path, PATHINFO_EXTENSION);
-        $relativePath = $imginfo->path;
-        $thumbnailPath = $imginfo->thumb_path;
-        $domain = $this->query->domain('localhost');
-
-        $payload = array(
-            'code' => 200,
-            'id' => $imginfo->id,
-            'imgid' => $imgid,
-            'relative_path' => $relativePath,
-            'url' => $domain . $relativePath,
-            'thumbnail_url' => $domain . $thumbnailPath
-        );
-
-        @unlink($tmpPath);
-        $this->re_data($type, $payload);
-        return;
-    }
-
-    $ext = ext($tmpPath);
-    if ($ext === FALSE) {
-        @unlink($tmpPath);
-        $this->error_msg('无法识别文件后缀！');
-    }
-
-    $fileName = $imgid . $ext;
-    $fullPath = $this->upload_path . $fileName;
-    $relativePath = $this->relative_path . $fileName;
-
-    if (!@rename($tmpPath, $fullPath)) {
-        if (!@copy($tmpPath, $fullPath)) {
-            @unlink($tmpPath);
-            $this->error_msg('保存文件失败！');
+        {
+            $this->load->library('image_storage');
+            try {
+                $result = $this->image_storage->store($tmpPath, $clientName, $this->user);
+            } catch (Image_storage_error $error) {
+                $this->error_msg($error->getMessage());
+            } catch (Throwable $error) {
+                log_message('error', 'Image upload failed ('.get_class($error).').');
+                $this->error_msg('暂时无法保存图片，请稍后重试。');
+            }
+            $this->re_data($type, $result['payload']);
         }
-        @unlink($tmpPath);
-    }
-
-    chmod($fullPath, 0644);
-    $thumbnailPath = $this->relative_path . $imgid . '_thumb' . $ext;
-
-    $this->load->library('image');
-    if (!$this->image->thumbnail($fullPath, 290, 175)) {
-        $thumbnailPath = $relativePath;
-    }
-
-    $imgInfo = @getimagesize($fullPath);
-    $width = is_array($imgInfo) ? (int)$imgInfo[0] : 0;
-    $height = is_array($imgInfo) ? (int)$imgInfo[1] : 0;
-    $mimeType = is_array($imgInfo) && isset($imgInfo['mime']) ? $imgInfo['mime'] : mime_content_type($fullPath);
-
-    $tokenData = array(
-        'ip' => get_ip(),
-        'ua' => get_ua(),
-        'date' => $this->date
-    );
-    $token = $this->token($tokenData);
-
-    $imageRow = array(
-        'imgid'      => $imgid,
-        'path'       => $relativePath,
-        'thumb_path' => $thumbnailPath,
-        'storage'    => 'localhost',
-        'ip'         => get_ip(),
-        'ua'         => get_ua(),
-        'date'       => $this->date,
-        'user'       => $this->user,
-        'level'      => 'unknown',
-        'token'      => $token
-    );
-
-    $imgInfoRow = array(
-        'imgid'       => $imgid,
-        'mime'        => $mimeType,
-        'width'       => $width,
-        'height'      => $height,
-        'ext'         => $ext,
-        'client_name' => $clientName
-    );
-
-    $this->load->model('insert', '', TRUE);
-    $id = $this->insert->createImageWithInfo($imageRow, $imgInfoRow);
-
-    if ($id === false) {
-        @unlink($fullPath);
-        if ($thumbnailPath !== $relativePath) { @unlink(FCPATH.ltrim($thumbnailPath, '/')); }
-        $this->error_msg('数据库写入失败！');
-    }
-
-    $domain = $this->query->domain('localhost');
-    $delete = $this->main_domain . '/delete/' . $token;
-
-    $payload = array(
-        'code' => 200,
-        'id' => $id,
-        'imgid' => $imgid,
-        'relative_path' => $relativePath,
-        'url' => $domain . $relativePath,
-        'thumbnail_url' => $domain . $thumbnailPath,
-        'width' => $width,
-        'height' => $height,
-        'delete' => $delete
-    );
-
-    $this->re_data($type, $payload);
-}
     }
 ?>

@@ -26,10 +26,17 @@ class Api_v1 extends CI_Controller {
                 $this->health($authorization !== '');
                 return;
             }
-            if ($path === 'images' || preg_match('~^images/[^/]+$~D', $path)) {
-                $this->method($verb, ['GET']);
-                $this->authorize('images:read', $this->authorization());
-                if ($path === 'images') { $this->images(); }
+            if ($path === 'images') {
+                $this->method($verb, ['GET', 'POST']);
+                $this->authorize($verb === 'POST' ? 'images:upload' : 'images:read', $this->authorization());
+                if ($verb === 'POST') { $this->upload_image(); }
+                else { $this->images(); }
+                return;
+            }
+            if (preg_match('~^images/[^/]+$~D', $path)) {
+                $this->method($verb, ['GET', 'DELETE']);
+                $this->authorize($verb === 'DELETE' ? 'images:delete' : 'images:read', $this->authorization());
+                if ($verb === 'DELETE') { $this->delete_image(substr($path, 7)); }
                 else { $this->image(substr($path, 7)); }
                 return;
             }
@@ -45,12 +52,7 @@ class Api_v1 extends CI_Controller {
                         }
                     }
                     foreach ($selections as $field => $value) { $selections[$field] = strtolower($value); }
-                    // Use the configured database with HTML SQL diagnostics disabled for API errors.
-                    require APPPATH.'config/database.php';
-                    $configuration = $db[$active_group];
-                    $configuration['db_debug'] = false;
-                    $this->load->database($configuration);
-                    if (empty($this->db->conn_id)) { throw new RuntimeException('Database unavailable'); }
+                    $this->database();
                     $settings = $this->branding->save([], $selections);
                 } else { $settings = $this->api_tokens->option('site_setting'); }
                 $this->respond(200, ['ok' => true, 'data' => $this->branding->presentation($settings)]);
@@ -59,6 +61,8 @@ class Api_v1 extends CI_Controller {
             throw new Api_v1_error(404, 'not_found', 'API 接口不存在。');
         } catch (Api_v1_error $error) {
             $this->respond($error->getCode(), ['ok' => false, 'error' => ['code' => $error->error_code, 'message' => $error->getMessage()]]);
+        } catch (Image_storage_error $error) {
+            $this->respond($error->getCode(), ['ok' => false, 'error' => ['code' => $error->error_code, 'message' => $error->getMessage()]]);
         } catch (InvalidArgumentException $error) {
             $this->respond(422, ['ok' => false, 'error' => ['code' => 'invalid_image', 'message' => $error->getMessage()]]);
         } catch (Throwable $error) {
@@ -66,6 +70,70 @@ class Api_v1 extends CI_Controller {
             log_message('error', 'API v1 operation failed ('.get_class($error).').');
             $this->respond(503, ['ok' => false, 'error' => ['code' => 'service_unavailable', 'message' => '服务暂不可用，请检查服务器日志、数据库及目录权限。']]);
         }
+    }
+
+    private function database(): void
+    {
+        // Use the site's configuration with HTML SQL diagnostics disabled for API errors.
+        require APPPATH.'config/database.php';
+        $configuration = $db[$active_group];
+        $configuration['db_debug'] = false;
+        $this->load->database($configuration);
+        if (empty($this->db->conn_id)) { throw new RuntimeException('Database unavailable'); }
+    }
+
+    private function upload_image(): void
+    {
+        $type = strtolower(trim(explode(';', $this->input->get_request_header('Content-Type') ?? '')[0]));
+        if ($type !== 'multipart/form-data') {
+            throw new Api_v1_error(415, 'unsupported_media_type', '请使用 multipart/form-data，并提供 file 文件字段。');
+        }
+        $this->database();
+        $max = upload_max_bytes();
+        $length = (int)($this->input->server('CONTENT_LENGTH') ?? 0);
+        $phpLimit = trim((string)ini_get('post_max_size'));
+        $units = ['k' => 1024, 'm' => 1024 ** 2, 'g' => 1024 ** 3];
+        $postMax = (int)((float)$phpLimit * ($units[strtolower(substr($phpLimit, -1))] ?? 1));
+        if ($length > $max + 65536 || ($postMax > 0 && $length > $postMax)) {
+            throw new Api_v1_error(413, 'payload_too_large', '上传请求超过站点或 PHP 大小限制。');
+        }
+        $file = $_FILES['file'] ?? null;
+        if (!is_array($file) || count($_FILES) !== 1 || !is_int($file['error'] ?? null)
+            || !is_string($file['tmp_name'] ?? null) || !is_string($file['name'] ?? null)) {
+            throw new Api_v1_error(400, 'invalid_parameter', '每次请求只能上传一张图片，请使用 file 文件字段。');
+        }
+        if (in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            throw new Api_v1_error(413, 'payload_too_large', '图片超过 PHP 上传大小限制。');
+        }
+        if (in_array($file['error'], [UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE, UPLOAD_ERR_EXTENSION], true)) {
+            throw new RuntimeException('PHP cannot receive uploaded file');
+        }
+        if ($file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
+            throw new Api_v1_error(400, 'missing_file', '图片未完整上传，请重新选择文件。');
+        }
+        $name = basename(str_replace('\\', '/', $file['name']));
+        $name = preg_replace('/[\x00-\x1f\x7f]/', '', $name);
+        if (!mb_check_encoding($name, 'UTF-8')) { throw new Api_v1_error(400, 'invalid_parameter', '文件名应使用 UTF-8 编码。'); }
+        $name = mb_strcut($name, 0, 255, 'UTF-8');
+        $this->load->library('image_storage');
+        $result = $this->image_storage->store($file['tmp_name'], $name ?: 'uploaded-image', 'admin');
+        if ($result['restricted']) { throw new Api_v1_error(409, 'image_unavailable', '该图片不可用于上传。'); }
+        $data = array_intersect_key($result['payload'], array_flip(['imgid', 'url', 'thumbnail_url', 'width', 'height', 'mime', 'size_bytes']));
+        $data['duplicate'] = !$result['created'];
+        $data['delete_endpoint'] = '/api/v1/images/'.$data['imgid'];
+        if ($result['created']) { $this->output->set_header('Location: '.$data['delete_endpoint']); }
+        $this->respond($result['created'] ? 201 : 200, ['ok' => true, 'data' => $data]);
+    }
+
+    private function delete_image(string $id): void
+    {
+        if (!preg_match('/^[a-f0-9]{16}$/iD', $id)) { throw new Api_v1_error(400, 'invalid_parameter', '图片 ID 无效。'); }
+        $this->database();
+        $this->load->model('delete');
+        $result = $this->delete->remove_by_id($id);
+        if ($result === null) { throw new Api_v1_error(404, 'not_found', '图片不存在或已删除。'); }
+        if (!$result) { throw new RuntimeException('Image deletion failed'); }
+        $this->respond(200, ['ok' => true, 'data' => ['imgid' => strtolower($id), 'deleted' => true]]);
     }
 
     private function method(string $actual, array $allowed): void

@@ -6,6 +6,8 @@ class Api_tokens {
     public const SCOPES = [
         'health:read' => '查看详细健康状态',
         'images:read' => '查询图片（含管理员上传的图片）',
+        'images:upload' => '上传图片',
+        'images:delete' => '删除任意图片（含访客和管理员上传）',
         'appearance:read' => '查看网站外观',
         'appearance:write' => '修改网站外观'
     ];
